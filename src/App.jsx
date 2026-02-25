@@ -7,6 +7,8 @@ import React, { useState, useEffect, useReducer, useCallback, useMemo, useRef, c
 import { LineChart, Line, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
         XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { supabase, isSupabaseConfigured } from './supabase';
+import * as db from './db.js';
+import { isStripeConfigured, redirectToCheckout, openBillingPortal } from './stripe.js';
 
 /* ─── Phase 1: Foundation ─────────────────────────────────────── */
 
@@ -290,7 +292,9 @@ function Badge({ children, variant = 'default', size = 'sm', style: sx }) {
     info: { background: `${COLORS.info}20`, color: COLORS.info },
     premium: { background: 'linear-gradient(135deg, #F59E0B20, #EF444420)', color: '#F59E0B' },
     pro: { background: `${COLORS.primary[500]}20`, color: COLORS.primary[400] },
+    professional: { background: `${COLORS.primary[500]}20`, color: COLORS.primary[400] },
     free: { background: `${c.textMuted}20`, color: c.textMuted },
+    starter: { background: `${c.textMuted}20`, color: c.textMuted },
     verified: { background: `${COLORS.accent[500]}20`, color: COLORS.accent[500] },
   };
   return React.createElement('span', {
@@ -303,6 +307,23 @@ function Badge({ children, variant = 'default', size = 'sm', style: sx }) {
       ...variants[variant], ...sx,
     },
   }, children);
+}
+
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { hasError: false, error: null }; }
+  static getDerivedStateFromError(error) { return { hasError: true, error }; }
+  componentDidCatch(error, info) { console.error('ErrorBoundary caught:', error, info); }
+  render() {
+    if (this.state.hasError) {
+      return React.createElement('div', { style: { padding: '40px', textAlign: 'center', fontFamily: 'system-ui' } },
+        React.createElement('h2', { style: { color: '#ef4444', marginBottom: '16px' } }, 'Something went wrong'),
+        React.createElement('pre', { style: { background: '#1a1a2e', color: '#f87171', padding: '20px', borderRadius: '8px', textAlign: 'left', overflow: 'auto', maxHeight: '300px', fontSize: '13px' } },
+          this.state.error?.toString() + '\n\n' + (this.state.error?.stack || '')),
+        React.createElement('button', { onClick: () => this.setState({ hasError: false, error: null }), style: { marginTop: '16px', padding: '10px 24px', background: '#8b5cf6', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600 } }, 'Try Again'),
+      );
+    }
+    return this.props.children;
+  }
 }
 
 function Card({ children, onClick, hover, glass, style: sx, className }) {
@@ -687,7 +708,7 @@ const PROVIDERS_DATA = [
     founded:2012,teamSize:'50+',languages:['English','Arabic','Mandarin','Vietnamese'],
     features:['24/7 on-call','Female/male workers','Cultural matching','Transport available'],
     viewsThisMonth:342,enquiriesThisMonth:28,bookingsThisMonth:15 },
-  { id:'p2',name:'PhysioPlus Disability',email:'physio@provider.com.au',password:'password',tier:'pro',verified:true,
+  { id:'p2',name:'PhysioPlus Disability',email:'physio@provider.com.au',password:'password',tier:'professional',verified:true,
     categories:['physiotherapy','therapy','early-intervention'],suburb:'Maitland',state:'NSW',postcode:'2320',phone:'02 4933 4321',website:'www.physioplusdisability.com.au',
     description:'PhysioPlus provides specialised physiotherapy and therapy services with state-of-the-art equipment including hydrotherapy pool and adaptive gym.',
     shortDescription:'Specialised physiotherapy with hydrotherapy pool and adaptive gym.',
@@ -699,7 +720,7 @@ const PROVIDERS_DATA = [
     founded:2016,teamSize:'20+',languages:['English','Korean','Cantonese'],
     features:['Hydrotherapy','Home visits','Telehealth','Group sessions'],
     viewsThisMonth:256,enquiriesThisMonth:18,bookingsThisMonth:12 },
-  { id:'p3',name:'CareFirst Plan Management',email:'carefirst@provider.com.au',password:'password',tier:'pro',verified:true,
+  { id:'p3',name:'CareFirst Plan Management',email:'carefirst@provider.com.au',password:'password',tier:'professional',verified:true,
     categories:['plan-management'],suburb:'Cessnock',state:'NSW',postcode:'2325',phone:'02 4990 3210',website:'www.carefirstpm.com.au',
     description:'CareFirst takes the stress out of managing your NDIS funds with 48-hour invoice processing and real-time budget tracking.',
     shortDescription:'Fast invoice processing with real-time budget tracking.',
@@ -735,7 +756,7 @@ const PROVIDERS_DATA = [
     founded:2017,teamSize:'12',languages:['English','Mandarin'],
     features:['Telehealth','School visits','PBS plans','Group therapy'],
     viewsThisMonth:289,enquiriesThisMonth:31,bookingsThisMonth:20 },
-  { id:'p6',name:'ConnectAbility Support Coordination',email:'connectability@provider.com.au',password:'password',tier:'pro',verified:false,
+  { id:'p6',name:'ConnectAbility Support Coordination',email:'connectability@provider.com.au',password:'password',tier:'professional',verified:false,
     categories:['support-coordination'],suburb:'Charlestown',state:'NSW',postcode:'2290',phone:'02 4943 0987',website:'www.connectability.com.au',
     description:'Helping participants navigate the NDIS system. Specialising in complex support needs and psychosocial disability.',
     shortDescription:'Expert support coordination for complex needs.',
@@ -747,7 +768,7 @@ const PROVIDERS_DATA = [
     founded:2019,teamSize:'8',languages:['English','Greek','Mandarin'],
     features:['Specialist SC','Crisis support','Provider network','Plan reviews'],
     viewsThisMonth:134,enquiriesThisMonth:11,bookingsThisMonth:8 },
-  { id:'p7',name:'DriveAbility Transport',email:'driveability@provider.com.au',password:'password',tier:'pro',verified:true,
+  { id:'p7',name:'DriveAbility Transport',email:'driveability@provider.com.au',password:'password',tier:'professional',verified:true,
     categories:['transport','community'],suburb:'Belmont',state:'NSW',postcode:'2280',phone:'02 4945 9876',website:'www.driveability.com.au',
     description:'Reliable wheelchair-accessible transport with modified vehicles featuring hoists and ramps.',
     shortDescription:'Wheelchair-accessible transport with trained drivers.',
@@ -759,7 +780,7 @@ const PROVIDERS_DATA = [
     founded:2015,teamSize:'25',languages:['English','Arabic','Bengali'],
     features:['Wheelchair accessible','Group transport','Medical transport','Weekend service'],
     viewsThisMonth:156,enquiriesThisMonth:15,bookingsThisMonth:22 },
-  { id:'p8',name:'WorkBridge Employment',email:'workbridge@provider.com.au',password:'password',tier:'pro',verified:false,
+  { id:'p8',name:'WorkBridge Employment',email:'workbridge@provider.com.au',password:'password',tier:'professional',verified:false,
     categories:['employment','community'],suburb:'Warners Bay',state:'NSW',postcode:'2282',phone:'02 4948 8765',website:'www.workbridge.com.au',
     description:'Supporting participants in finding and maintaining meaningful employment with comprehensive job support.',
     shortDescription:'Employment support from resume to retention.',
@@ -771,7 +792,7 @@ const PROVIDERS_DATA = [
     founded:2020,teamSize:'10',languages:['English','Vietnamese','Arabic'],
     features:['Resume writing','Mock interviews','Job matching','In-work support'],
     viewsThisMonth:87,enquiriesThisMonth:8,bookingsThisMonth:4 },
-  { id:'p9',name:'NurtureCare Nursing',email:'nurturecare@provider.com.au',password:'password',tier:'pro',verified:true,
+  { id:'p9',name:'NurtureCare Nursing',email:'nurturecare@provider.com.au',password:'password',tier:'professional',verified:true,
     categories:['nursing','daily-living'],suburb:'Toronto',state:'NSW',postcode:'2283',phone:'02 4959 7654',website:'www.nurturecare.com.au',
     description:'Registered nursing for complex health needs including medication management, wound care, and health monitoring.',
     shortDescription:'Registered nursing for complex health needs.',
@@ -795,7 +816,7 @@ const PROVIDERS_DATA = [
     founded:2015,teamSize:'18',languages:['English','Mandarin','Korean'],
     features:['Multidisciplinary','School visits','Parent training','Group programs'],
     viewsThisMonth:267,enquiriesThisMonth:25,bookingsThisMonth:16 },
-  { id:'p11',name:'MealMate Kitchen',email:'mealmate@provider.com.au',password:'password',tier:'free',verified:false,
+  { id:'p11',name:'MealMate Kitchen',email:'mealmate@provider.com.au',password:'password',tier:'starter',verified:false,
     categories:['meal-prep','daily-living'],suburb:'Wyong',state:'NSW',postcode:'2259',phone:'02 4353 2222',website:'',
     description:'Meal planning, grocery shopping, and cooking skills support based on dietary needs.',
     shortDescription:'Meal prep and cooking support.',photos:[],
@@ -804,7 +825,7 @@ const PROVIDERS_DATA = [
     availability:{mon:'9am-3pm',tue:'9am-3pm',wed:'9am-3pm',thu:'9am-3pm',fri:'9am-1pm',sat:'Closed',sun:'Closed'},
     serviceAreas:['Wyong','Tuggerah','The Entrance'],founded:2021,teamSize:'5',languages:['English'],
     features:['Dietary plans','Cooking skills'],viewsThisMonth:45,enquiriesThisMonth:3,bookingsThisMonth:2 },
-  { id:'p12',name:'Happy Days Community',email:'happydays@provider.com.au',password:'password',tier:'free',verified:false,
+  { id:'p12',name:'Happy Days Community',email:'happydays@provider.com.au',password:'password',tier:'starter',verified:false,
     categories:['community','respite'],suburb:'Tuggerah',state:'NSW',postcode:'2259',phone:'02 4353 3333',website:'',
     description:'Fun community group activities and weekend respite for adults with disability.',
     shortDescription:'Fun community activities and weekend respite.',photos:[],
@@ -813,7 +834,7 @@ const PROVIDERS_DATA = [
     availability:{mon:'10am-4pm',tue:'Closed',wed:'10am-4pm',thu:'Closed',fri:'10am-4pm',sat:'9am-4pm',sun:'Closed'},
     serviceAreas:['Tuggerah','Wyong','Gosford'],founded:2022,teamSize:'4',languages:['English'],
     features:['Group activities','Weekend programs'],viewsThisMonth:34,enquiriesThisMonth:2,bookingsThisMonth:1 },
-  { id:'p13',name:'SafeHands Daily',email:'safehands@provider.com.au',password:'password',tier:'free',verified:false,
+  { id:'p13',name:'SafeHands Daily',email:'safehands@provider.com.au',password:'password',tier:'starter',verified:false,
     categories:['daily-living'],suburb:'The Entrance',state:'NSW',postcode:'2261',phone:'02 4332 4444',website:'',
     description:'Personal care and daily living support on the Central Coast.',
     shortDescription:'Personal care on the Central Coast.',photos:[],
@@ -822,7 +843,7 @@ const PROVIDERS_DATA = [
     availability:{mon:'7am-5pm',tue:'7am-5pm',wed:'7am-5pm',thu:'7am-5pm',fri:'7am-3pm',sat:'Closed',sun:'Closed'},
     serviceAreas:['The Entrance','Tuggerah','Gosford'],founded:2023,teamSize:'3',languages:['English'],
     features:['Personal care','Domestic help'],viewsThisMonth:28,enquiriesThisMonth:2,bookingsThisMonth:1 },
-  { id:'p14',name:'GreenThumb Garden Therapy',email:'greenthumb@provider.com.au',password:'password',tier:'free',verified:false,
+  { id:'p14',name:'GreenThumb Garden Therapy',email:'greenthumb@provider.com.au',password:'password',tier:'starter',verified:false,
     categories:['community','therapy'],suburb:'Muswellbrook',state:'NSW',postcode:'2333',phone:'02 6543 5555',website:'',
     description:'Therapeutic gardening and horticulture programs.',
     shortDescription:'Therapeutic gardening programs.',photos:[],
@@ -831,7 +852,7 @@ const PROVIDERS_DATA = [
     availability:{mon:'9am-2pm',tue:'9am-2pm',wed:'Closed',thu:'9am-2pm',fri:'9am-2pm',sat:'Closed',sun:'Closed'},
     serviceAreas:['Muswellbrook','Singleton','Cessnock'],founded:2022,teamSize:'3',languages:['English','Korean'],
     features:['Garden therapy','Group programs'],viewsThisMonth:42,enquiriesThisMonth:3,bookingsThisMonth:2 },
-  { id:'p15',name:'TechAssist AT Solutions',email:'techassist@provider.com.au',password:'password',tier:'pro',verified:true,
+  { id:'p15',name:'TechAssist AT Solutions',email:'techassist@provider.com.au',password:'password',tier:'professional',verified:true,
     categories:['assistive-tech'],suburb:'Singleton',state:'NSW',postcode:'2330',phone:'02 6571 6666',website:'www.techassist.com.au',
     description:'Assistive technology assessments, supply, and training from communication devices to smart home systems.',
     shortDescription:'AT assessments, supply and training.',
@@ -851,7 +872,7 @@ const PROVIDERS_DATA = [
     availability:{mon:'24/7',tue:'24/7',wed:'24/7',thu:'24/7',fri:'24/7',sat:'24/7',sun:'24/7'},
     serviceAreas:['Nelson Bay','Raymond Terrace','Newcastle','Maitland'],founded:2016,teamSize:'95',languages:['English','Samoan','Tongan','Arabic'],
     features:['SDA certified','24/7 nursing','Sensory gardens','Community bus'],viewsThisMonth:176,enquiriesThisMonth:12,bookingsThisMonth:3 },
-  { id:'p17',name:'SpeakEasy Speech Pathology',email:'speakeasy@provider.com.au',password:'password',tier:'pro',verified:true,
+  { id:'p17',name:'SpeakEasy Speech Pathology',email:'speakeasy@provider.com.au',password:'password',tier:'professional',verified:true,
     categories:['therapy','early-intervention'],suburb:'Kurri Kurri',state:'NSW',postcode:'2327',phone:'02 4937 8888',website:'www.speakeasysp.com.au',
     description:'Speech pathology for communication difficulties, swallowing disorders, and language delays.',
     shortDescription:'Speech pathology for communication and language.',
@@ -861,7 +882,7 @@ const PROVIDERS_DATA = [
     availability:{mon:'8am-6pm',tue:'8am-6pm',wed:'8am-6pm',thu:'8am-6pm',fri:'8am-4pm',sat:'9am-12pm',sun:'Closed'},
     serviceAreas:['Kurri Kurri','Cessnock','Maitland','Singleton'],founded:2019,teamSize:'8',languages:['English'],
     features:['AAC specialist','Mealtime management','Social skills','Telehealth'],viewsThisMonth:145,enquiriesThisMonth:16,bookingsThisMonth:10 },
-  { id:'p18',name:'FreshStart Respite',email:'freshstart@provider.com.au',password:'password',tier:'free',verified:false,
+  { id:'p18',name:'FreshStart Respite',email:'freshstart@provider.com.au',password:'password',tier:'starter',verified:false,
     categories:['respite'],suburb:'Morisset',state:'NSW',postcode:'2264',phone:'02 4973 9999',website:'',
     description:'In-home and centre-based respite care so carers can recharge.',
     shortDescription:'In-home and centre-based respite.',photos:[],
@@ -870,7 +891,7 @@ const PROVIDERS_DATA = [
     availability:{mon:'8am-6pm',tue:'8am-6pm',wed:'8am-6pm',thu:'8am-6pm',fri:'8am-4pm',sat:'9am-3pm',sun:'Closed'},
     serviceAreas:['Morisset','Toronto','Lake Macquarie'],founded:2023,teamSize:'6',languages:['English'],
     features:['In-home respite','Centre-based','Overnight'],viewsThisMonth:22,enquiriesThisMonth:1,bookingsThisMonth:1 },
-  { id:'p19',name:'Basic Care Provider',email:'basic@provider.com.au',password:'password',tier:'free',verified:false,
+  { id:'p19',name:'Basic Care Provider',email:'basic@provider.com.au',password:'password',tier:'starter',verified:false,
     categories:['daily-living','transport'],suburb:'Swansea',state:'NSW',postcode:'2281',phone:'02 4971 0000',website:'',
     description:'Daily living support and transport in the Swansea area.',
     shortDescription:'Daily living and transport in Swansea.',photos:[],
@@ -879,7 +900,7 @@ const PROVIDERS_DATA = [
     availability:{mon:'8am-4pm',tue:'8am-4pm',wed:'8am-4pm',thu:'8am-4pm',fri:'8am-2pm',sat:'Closed',sun:'Closed'},
     serviceAreas:['Swansea','Belmont','Lake Macquarie'],founded:2024,teamSize:'2',languages:['English'],
     features:['Personal care','Transport'],viewsThisMonth:15,enquiriesThisMonth:1,bookingsThisMonth:0 },
-  { id:'p20',name:'Pathways OT',email:'pathways@provider.com.au',password:'password',tier:'pro',verified:true,
+  { id:'p20',name:'Pathways OT',email:'pathways@provider.com.au',password:'password',tier:'professional',verified:true,
     categories:['therapy','assistive-tech','daily-living'],suburb:'Merewether',state:'NSW',postcode:'2291',phone:'02 4963 1111',website:'www.pathwaysot.com.au',
     description:'Occupational therapy for maximising independence through functional assessments, home mods, and sensory support.',
     shortDescription:'OT for independence and home mods.',
@@ -1170,7 +1191,7 @@ const BOOKINGS_DATA = [
 // ── Analytics Data ──
 const ANALYTICS_MONTHS = ['Jul','Aug','Sep','Oct','Nov','Dec','Jan'];
 function generateAnalytics(provider) {
-  const base = provider.tier === 'premium' ? 300 : provider.tier === 'pro' ? 150 : 50;
+  const base = provider.tier === 'premium' ? 300 : provider.tier === 'professional' ? 150 : 50;
   return ANALYTICS_MONTHS.map((month, i) => ({
     month,
     views: Math.floor(base * (0.8 + Math.random() * 0.6) + i * 15),
@@ -1263,7 +1284,7 @@ function rankProviders(providers, query, filters) {
 
   // Sort by tier weight + rating + response rate
   results.sort((a, b) => {
-    const tierWeight = { premium: 100, pro: 50, free: 0 };
+    const tierWeight = { premium: 100, professional: 50, starter: 0 };
     const scoreA = tierWeight[a.tier] + (a.rating * 10) + (a.responseRate * 0.5);
     const scoreB = tierWeight[b.tier] + (b.rating * 10) + (b.responseRate * 0.5);
     return scoreB - scoreA;
@@ -1315,6 +1336,13 @@ const ACTION_TYPES = {
   SET_TESTIMONIAL_INDEX: 'SET_TESTIMONIAL_INDEX',
   INCREMENT_VIEWS: 'INCREMENT_VIEWS',
   SET_MOBILE_SIDEBAR: 'SET_MOBILE_SIDEBAR',
+  SET_LOADING: 'SET_LOADING',
+  SET_DB_PROVIDERS: 'SET_DB_PROVIDERS',
+  SET_DB_PARTICIPANTS: 'SET_DB_PARTICIPANTS',
+  SET_DB_REVIEWS: 'SET_DB_REVIEWS',
+  SET_DB_ENQUIRIES: 'SET_DB_ENQUIRIES',
+  SET_DB_BOOKINGS: 'SET_DB_BOOKINGS',
+  MERGE_DB_DATA: 'MERGE_DB_DATA',
 };
 
 function getInitialState() {
@@ -1345,6 +1373,7 @@ function getInitialState() {
     registerRole: 'participant',
     faqOpen: {},
     testimonialIndex: 0,
+    loading: true,
   };
 }
 
@@ -1445,6 +1474,19 @@ function appReducer(state, action) {
       return { ...state, testimonialIndex: action.payload };
     case ACTION_TYPES.INCREMENT_VIEWS:
       return { ...state, providers: state.providers.map(p => p.id === action.payload ? { ...p, viewsThisMonth: p.viewsThisMonth + 1 } : p) };
+    case ACTION_TYPES.SET_LOADING:
+      return { ...state, loading: action.payload };
+    case ACTION_TYPES.SET_DB_PROVIDERS:
+      // Merge DB providers with mock seed data (seed data keeps mock IDs like p1, p2, etc.)
+      return { ...state, providers: [...PROVIDERS_DATA, ...action.payload.filter(dbp => !PROVIDERS_DATA.some(mp => mp.email === dbp.email))] };
+    case ACTION_TYPES.SET_DB_PARTICIPANTS:
+      return { ...state, participants: [...PARTICIPANTS_DATA, ...action.payload.filter(dbp => !PARTICIPANTS_DATA.some(mp => mp.email === dbp.email))] };
+    case ACTION_TYPES.SET_DB_REVIEWS:
+      return { ...state, reviews: [...REVIEWS_DATA, ...action.payload.filter(dbr => !REVIEWS_DATA.some(mr => mr.id === dbr.id))] };
+    case ACTION_TYPES.SET_DB_ENQUIRIES:
+      return { ...state, enquiries: [...ENQUIRIES_DATA, ...action.payload.filter(dbe => !ENQUIRIES_DATA.some(me => me.id === dbe.id))] };
+    case ACTION_TYPES.SET_DB_BOOKINGS:
+      return { ...state, bookings: [...BOOKINGS_DATA, ...action.payload.filter(dbb => !BOOKINGS_DATA.some(mb => mb.id === dbb.id))] };
     default:
       return state;
   }
@@ -1606,10 +1648,10 @@ function Sidebar() {
         React.createElement('p', { style: { fontSize: FONT_SIZES.xs, color: c.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 } },
           role === 'admin' ? 'Admin Panel' : role === 'provider' ? 'Provider Dashboard' : 'My Dashboard'),
         state.user.role === 'provider' && React.createElement(Badge, {
-          variant: state.providers?.find(p => p.email === state.user.email)?.tier || 'free',
+          variant: state.providers?.find(p => p.email === state.user.email)?.tier || 'starter',
           size: 'xs',
           style: { marginTop: '4px' },
-        }, (state.providers?.find(p => p.email === state.user.email)?.tier || 'free').charAt(0).toUpperCase() + (state.providers?.find(p => p.email === state.user.email)?.tier || 'free').slice(1) + ' Plan'),
+        }, (state.providers?.find(p => p.email === state.user.email)?.tier || 'starter').charAt(0).toUpperCase() + (state.providers?.find(p => p.email === state.user.email)?.tier || 'starter').slice(1) + ' Plan'),
       ),
 
       // Nav items
@@ -2158,10 +2200,24 @@ function LoginPage() {
         // Look up user profile
         const { data: profile } = await supabase.from('user_profiles').select('*').eq('id', data.user.id).single();
         const role = profile?.role || 'participant';
-        const user = { id: data.user.id, name: profile?.name || data.user.email, email: data.user.email, role, tier: profile?.tier || 'free' };
+        const user = { id: data.user.id, name: profile?.name || data.user.email, email: data.user.email, role, tier: profile?.tier || 'starter' };
         dispatch({type:ACTION_TYPES.SET_USER,payload:user});
         dispatch({type:ACTION_TYPES.NAV_GOTO,payload:{route: role === 'admin' ? 'admin-dashboard' : role === 'provider' ? 'provider-dashboard' : 'participant-dashboard'}});
         dispatch({type:ACTION_TYPES.SET_DASHBOARD_TAB,payload:'overview'});
+
+        // Load provider/participant record from DB
+        if (role === 'provider') {
+          const dbProvider = await db.fetchProviderByUserId(data.user.id);
+          if (dbProvider) {
+            dispatch({type:ACTION_TYPES.UPDATE_PROVIDER_PROFILE,payload:dbProvider});
+          }
+        } else if (role === 'participant') {
+          const dbParticipant = await db.fetchParticipant(data.user.id);
+          if (dbParticipant) {
+            dispatch({type:ACTION_TYPES.UPDATE_PARTICIPANT_PROFILE,payload:dbParticipant});
+          }
+        }
+
         addToast(`Welcome back, ${user.name}!`, 'success');
       } catch (err) {
         setError('Login failed. Please try again.');
@@ -2220,11 +2276,11 @@ function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const update = (k, v) => setFormData(prev => ({ ...prev, [k]: v }));
 
-  const localRegister = (role) => {
+  const localRegister = (role, supabaseUserId) => {
     if (role === 'provider') {
       const newProvider = {
-        id: 'p' + (state.providers.length + 1), name: formData.businessName || formData.name,
-        email: formData.email, password: formData.password, tier: 'free', verified: false,
+        id: supabaseUserId || ('p' + (state.providers.length + 1)), name: formData.businessName || formData.name,
+        email: formData.email, password: formData.password, tier: 'starter', verified: false,
         categories: formData.category ? [formData.category] : ['daily-living'],
         suburb: formData.suburb || 'Newcastle', state: 'NSW', postcode: '2300',
         phone: formData.phone || '', website: '',
@@ -2237,14 +2293,14 @@ function RegisterPage() {
         viewsThisMonth: 0, enquiriesThisMonth: 0, bookingsThisMonth: 0,
       };
       dispatch({type:ACTION_TYPES.UPDATE_PROVIDER_PROFILE,payload:newProvider});
-      const user = { id: newProvider.id, name: newProvider.name, email: newProvider.email, role: 'provider', tier: 'free' };
+      const user = { id: newProvider.id, name: newProvider.name, email: newProvider.email, role: 'provider', tier: 'starter' };
       dispatch({type:ACTION_TYPES.SET_USER,payload:user});
       dispatch({type:ACTION_TYPES.NAV_GOTO,payload:{route:'provider-dashboard'}});
       dispatch({type:ACTION_TYPES.SET_DASHBOARD_TAB,payload:'overview'});
       addToast('Welcome to NexaConnect! Set up your profile to get started.', 'success');
     } else {
       const newParticipant = {
-        id: 'u' + (state.participants.length + 1), name: formData.name,
+        id: supabaseUserId || ('u' + (state.participants.length + 1)), name: formData.name,
         email: formData.email, password: formData.password, role: 'participant',
         suburb: formData.suburb || 'Newcastle', state: 'NSW',
         ndisNumber: '', planType: 'Plan Managed', goals: [], categories: [], favourites: [],
@@ -2284,11 +2340,34 @@ function RegisterPage() {
           email: formData.email,
           name: formData.name,
           role: role,
-          tier: 'free',
+          tier: 'starter',
         });
+
+        // Insert into providers or participants table
+        if (role === 'provider') {
+          await db.createProvider(data.user.id, {
+            name: formData.businessName || formData.name,
+            email: formData.email,
+            tier: 'starter',
+            categories: formData.category ? [formData.category] : ['daily-living'],
+            suburb: formData.suburb || 'Newcastle',
+            state: 'NSW',
+            postcode: '2300',
+            phone: formData.phone || '',
+            serviceAreas: [formData.suburb || 'Newcastle'],
+          });
+        } else {
+          await db.createParticipant(data.user.id, {
+            name: formData.name,
+            email: formData.email,
+            suburb: formData.suburb || 'Newcastle',
+            state: 'NSW',
+          });
+        }
+
         addToast('Account created! Check your email for confirmation.', 'success');
-        // Also do local registration so the app works immediately with mock data
-        localRegister(role);
+        // Also do local registration so the app works immediately
+        localRegister(role, data.user.id);
       } catch (err) {
         addToast('Registration failed. Please try again.', 'error');
       }
@@ -2338,10 +2417,12 @@ function RegisterPage() {
       React.createElement(Input, { label: 'Phone', value: formData.phone, onChange: v => update('phone',v), placeholder: '04XX XXX XXX' }),
       React.createElement(Select, { label: 'Suburb', value: formData.suburb, onChange: v => update('suburb',v),
         options: [{value:'',label:'Select suburb'},...SUBURBS.map(s => ({value:s,label:s}))] }),
+      state.registerRole === 'provider' && React.createElement(Input, { label: 'ABN', value: formData.abn, onChange: v => update('abn',v), placeholder: 'XX XXX XXX XXX' }),
       state.registerRole === 'provider' && React.createElement(Select, { label: 'Primary Category', value: formData.category, onChange: v => update('category',v),
         options: [{value:'',label:'Select category'},...CATEGORIES.map(c => ({value:c.id,label:c.name}))] }),
 
-      React.createElement(Button, { variant: 'primary', fullWidth: true, onClick: handleRegister, style: { marginTop: '8px' } },
+      React.createElement(Button, { variant: 'primary', fullWidth: true, onClick: handleRegister, disabled: loading, style: { marginTop: '8px' } },
+        loading ? React.createElement(Spinner, { size: 16, color: '#fff' }) :
         state.registerRole === 'provider' ? 'Create Provider Account' : 'Create Account'),
       React.createElement('div', { style: { textAlign: 'center', marginTop: '20px' } },
         React.createElement('span', { style: { color: c.textSecondary, fontSize: FONT_SIZES.sm } }, 'Already have an account? '),
@@ -2364,8 +2445,8 @@ function ProviderCard({ provider, onView, onFavourite, isFavourite }) {
   const { theme } = useTheme();
   const c = COLORS[theme];
   const responsive = useResponsive();
-  const tierColors = { premium: '#F59E0B', pro: COLORS.primary[500], free: c.textMuted };
-  const tierLabels = { premium: 'Premium', pro: 'Professional', free: 'Starter' };
+  const tierColors = { premium: '#F59E0B', professional: COLORS.primary[500], starter: c.textMuted };
+  const tierLabels = { premium: 'Premium', professional: 'Professional', starter: 'Starter' };
 
   return React.createElement(Card, {
     hover: true,
@@ -2399,7 +2480,7 @@ function ProviderCard({ provider, onView, onFavourite, isFavourite }) {
     // Description
     React.createElement('p', { style: { fontSize: FONT_SIZES.sm, color: c.textSecondary, lineHeight: 1.5, marginBottom: '12px',
       display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' } },
-      provider.tier === 'free' ? provider.shortDescription.slice(0, 200) : provider.shortDescription),
+      provider.tier === 'starter' ? provider.shortDescription.slice(0, 200) : provider.shortDescription),
 
     // Categories
     React.createElement('div', { style: { display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' } },
@@ -2569,40 +2650,49 @@ function ProviderProfilePage() {
 
   const participant = state.user?.role === 'participant' ? state.participants.find(p => p.id === state.user.id) : null;
   const isFav = participant?.favourites?.includes(provider.id);
-  const tierColors = { premium: '#F59E0B', pro: COLORS.primary[500], free: c.textMuted };
+  const tierColors = { premium: '#F59E0B', professional: COLORS.primary[500], starter: c.textMuted };
 
-  const sendEnquiry = () => {
+  const sendEnquiry = async () => {
     if (!state.user || !enquiryText.trim()) { addToast('Please log in and write a message', 'error'); return; }
-    dispatch({type:ACTION_TYPES.SEND_ENQUIRY,payload:{
+    const enquiryPayload = {
       providerId: provider.id, participantId: state.user.id,
       participantName: state.user.name, providerName: provider.name,
       subject: `Enquiry about ${provider.name}`, message: enquiryText,
-    }});
+    };
+    dispatch({type:ACTION_TYPES.SEND_ENQUIRY,payload:enquiryPayload});
+    // Persist to DB
+    db.sendEnquiry(enquiryPayload);
     setEnquiryText('');
     setShowEnquiryModal(false);
     addToast('Enquiry sent successfully!', 'success');
   };
 
-  const submitBooking = () => {
+  const submitBooking = async () => {
     if (!state.user || !bookingData.date) { addToast('Please fill in booking details', 'error'); return; }
-    dispatch({type:ACTION_TYPES.CREATE_BOOKING,payload:{
+    const bookingPayload = {
       providerId: provider.id, participantId: state.user.id,
       participantName: state.user.name, providerName: provider.name,
       service: bookingData.service, date: bookingData.date, time: bookingData.time,
       duration: '1 hour', notes: bookingData.notes,
-    }});
+    };
+    dispatch({type:ACTION_TYPES.CREATE_BOOKING,payload:bookingPayload});
+    // Persist to DB
+    db.createBooking(bookingPayload);
     setBookingData({ service: '', date: '', time: '', notes: '' });
     setShowBookingModal(false);
     addToast('Booking request sent!', 'success');
   };
 
-  const submitReview = () => {
+  const submitReview = async () => {
     if (!state.user || !reviewData.text.trim()) { addToast('Please write a review', 'error'); return; }
-    dispatch({type:ACTION_TYPES.SUBMIT_REVIEW,payload:{
+    const reviewPayload = {
       providerId: provider.id, participantId: state.user.id,
       participantName: state.user.name.split(' ')[0] + ' ' + state.user.name.split(' ').pop()[0] + '.',
       rating: reviewData.rating, text: reviewData.text,
-    }});
+    };
+    dispatch({type:ACTION_TYPES.SUBMIT_REVIEW,payload:reviewPayload});
+    // Persist to DB
+    db.submitReview(reviewPayload);
     setReviewData({ rating: 5, text: '' });
     setShowReviewModal(false);
     addToast('Review submitted!', 'success');
@@ -2798,12 +2888,24 @@ function ProviderDashboard() {
   const tab = state.dashboardTab;
 
   const provider = state.providers.find(p => p.email === state.user?.email);
+  const analytics = useMemo(() => provider ? generateAnalytics(provider) : [], [provider?.id]);
+
+  // All useState hooks must be called unconditionally (React Rules of Hooks)
+  const [editData, setEditData] = useState(() => provider ? {
+    description: provider.description, shortDescription: provider.shortDescription,
+    phone: provider.phone, website: provider.website,
+    suburb: provider.suburb, waitTime: provider.waitTime,
+  } : {});
+  const [selectedEnquiry, setSelectedEnquiry] = useState(null);
+  const [replyText, setReplyText] = useState('');
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [responseText, setResponseText] = useState('');
+
   if (!provider) return React.createElement(EmptyState, { title: 'Provider not found' });
 
   const myReviews = state.reviews.filter(r => r.providerId === provider.id);
   const myEnquiries = state.enquiries.filter(e => e.providerId === provider.id);
   const myBookings = state.bookings.filter(b => b.providerId === provider.id);
-  const analytics = useMemo(() => generateAnalytics(provider), [provider.id]);
   const plan = PLANS.find(p => p.id === provider.tier) || PLANS[0];
 
   // ── Overview Tab ──
@@ -2851,7 +2953,7 @@ function ProviderDashboard() {
 
   // ── Analytics Tab ──
   if (tab === 'analytics') {
-    if (provider.tier === 'free') return React.createElement('div', { style: { padding: '24px 32px' } },
+    if (provider.tier === 'starter') return React.createElement('div', { style: { padding: '24px 32px' } },
       React.createElement(EmptyState, {
         icon: Icons.barChart(48, c.textMuted), title: 'Analytics Locked',
         description: 'Upgrade to Professional or Premium to access analytics.',
@@ -2919,13 +3021,12 @@ function ProviderDashboard() {
 
   // ── Profile Editor Tab ──
   if (tab === 'profile-edit') {
-    const [editData, setEditData] = useState({
-      description: provider.description, shortDescription: provider.shortDescription,
-      phone: provider.phone, website: provider.website,
-      suburb: provider.suburb, waitTime: provider.waitTime,
-    });
-    const saveProfile = () => {
+    const saveProfile = async () => {
       dispatch({type:ACTION_TYPES.UPDATE_PROVIDER_PROFILE,payload:{ id: provider.id, ...editData }});
+      // Persist to Supabase if configured
+      if (isSupabaseConfigured() && provider.id && !provider.id.startsWith('p')) {
+        await db.updateProvider(provider.id, editData);
+      }
       addToast('Profile updated!', 'success');
     };
     return React.createElement('div', { style: { padding: responsive.isMobile ? '20px 16px' : '24px 32px', maxWidth: '800px' } },
@@ -2948,13 +3049,13 @@ function ProviderDashboard() {
 
   // ── Inbox Tab ──
   if (tab === 'inbox') {
-    const [selectedEnquiry, setSelectedEnquiry] = useState(null);
-    const [replyText, setReplyText] = useState('');
     const sel = myEnquiries.find(e => e.id === selectedEnquiry);
 
-    const sendReply = () => {
+    const sendReply = async () => {
       if (!replyText.trim()) return;
       dispatch({type:ACTION_TYPES.REPLY_ENQUIRY,payload:{enquiryId:selectedEnquiry,text:replyText,from:'provider'}});
+      // Persist to DB
+      db.replyEnquiry(selectedEnquiry, replyText, 'provider');
       setReplyText('');
       addToast('Reply sent!', 'success');
     };
@@ -2989,7 +3090,7 @@ function ProviderDashboard() {
               React.createElement('p', { style: { fontSize: FONT_SIZES.xs, color: c.textMuted } }, sel.subject),
             ),
             sel.status === 'active' && React.createElement(Button, { variant: 'ghost', size: 'sm',
-              onClick: () => { dispatch({type:ACTION_TYPES.CLOSE_ENQUIRY,payload:sel.id}); addToast('Enquiry closed', 'info'); }
+              onClick: () => { dispatch({type:ACTION_TYPES.CLOSE_ENQUIRY,payload:sel.id}); db.closeEnquiry(sel.id); addToast('Enquiry closed', 'info'); }
             }, 'Close'),
           ),
           React.createElement('div', { style: { flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px' } },
@@ -3039,8 +3140,8 @@ function ProviderDashboard() {
           ),
           b.notes && React.createElement('p', { style: { fontSize: FONT_SIZES.xs, color: c.textMuted, fontStyle: 'italic' } }, b.notes),
           b.status === 'pending' && React.createElement('div', { style: { display: 'flex', gap: '8px', marginTop: '12px' } },
-            React.createElement(Button, { variant: 'primary', size: 'sm', onClick: () => { dispatch({type:ACTION_TYPES.UPDATE_BOOKING,payload:{id:b.id,status:'confirmed'}}); addToast('Booking confirmed!', 'success'); } }, 'Accept'),
-            React.createElement(Button, { variant: 'danger', size: 'sm', onClick: () => { dispatch({type:ACTION_TYPES.UPDATE_BOOKING,payload:{id:b.id,status:'cancelled'}}); addToast('Booking declined', 'info'); } }, 'Decline'),
+            React.createElement(Button, { variant: 'primary', size: 'sm', onClick: () => { dispatch({type:ACTION_TYPES.UPDATE_BOOKING,payload:{id:b.id,status:'confirmed'}}); db.updateBooking(b.id,{status:'confirmed'}); addToast('Booking confirmed!', 'success'); } }, 'Accept'),
+            React.createElement(Button, { variant: 'danger', size: 'sm', onClick: () => { dispatch({type:ACTION_TYPES.UPDATE_BOOKING,payload:{id:b.id,status:'cancelled'}}); db.updateBooking(b.id,{status:'cancelled'}); addToast('Booking declined', 'info'); } }, 'Decline'),
           ),
         )),
       ),
@@ -3049,8 +3150,6 @@ function ProviderDashboard() {
 
   // ── Reviews Tab ──
   if (tab === 'reviews') {
-    const [replyingTo, setReplyingTo] = useState(null);
-    const [responseText, setResponseText] = useState('');
     return React.createElement('div', { style: { padding: responsive.isMobile ? '20px 16px' : '24px 32px' } },
       React.createElement('h2', { style: { fontSize: FONT_SIZES['2xl'], fontWeight: 800, color: c.text, marginBottom: '8px' } }, 'Reviews'),
       React.createElement('div', { style: { display: 'flex', gap: '16px', marginBottom: '24px' } },
@@ -3077,11 +3176,12 @@ function ProviderDashboard() {
           React.createElement('p', { style: { fontSize: FONT_SIZES.xs, fontWeight: 600, color: COLORS.primary[500], marginBottom: '4px' } }, 'Your Response'),
           React.createElement('p', { style: { fontSize: FONT_SIZES.sm, color: c.textSecondary } }, r.response),
         ) :
-        (provider.tier !== 'free' && (replyingTo === r.id ?
+        (provider.tier !== 'starter' && (replyingTo === r.id ?
           React.createElement('div', { style: { marginTop: '12px', display: 'flex', gap: '8px' } },
             React.createElement('input', { value: responseText, onChange: e => setResponseText(e.target.value), placeholder: 'Write a response...', style: { flex: 1, padding: '8px 12px', background: c.surfaceAlt, border: `1px solid ${c.border}`, borderRadius: RADIUS.md, color: c.text, outline: 'none', fontFamily: FONTS.sans, fontSize: FONT_SIZES.sm } }),
             React.createElement(Button, { variant: 'primary', size: 'sm', onClick: () => {
               dispatch({type:ACTION_TYPES.RESPOND_REVIEW,payload:{reviewId:r.id,response:responseText}});
+              db.respondToReview(r.id, responseText);
               setReplyingTo(null); setResponseText(''); addToast('Response posted!', 'success');
             } }, 'Post'),
             React.createElement(Button, { variant: 'ghost', size: 'sm', onClick: () => setReplyingTo(null) }, 'Cancel'),
@@ -3094,6 +3194,47 @@ function ProviderDashboard() {
 
   // ── Subscription Tab ──
   if (tab === 'subscription') {
+    const handleUpgrade = async (p) => {
+      if (p.id === 'starter') {
+        dispatch({type:ACTION_TYPES.UPGRADE_PLAN,payload:{providerId:provider.id,tier:p.id}});
+        addToast(`Plan changed to ${p.name}!`, 'success');
+        return;
+      }
+      // If Stripe is configured and this is a real (non-mock) provider, use Stripe checkout
+      if (isStripeConfigured() && isSupabaseConfigured() && provider.id && !provider.id.startsWith('p')) {
+        try {
+          addToast('Redirecting to checkout...', 'info');
+          await redirectToCheckout({
+            providerId: provider.id,
+            priceId: p.stripePriceId, // Set in Stripe Dashboard
+            planName: p.id,
+            billingCycle: state.billingCycle,
+          });
+        } catch (err) {
+          addToast('Checkout unavailable. Set up Stripe products first.', 'error');
+          // Fall back to local plan change for demo
+          dispatch({type:ACTION_TYPES.UPGRADE_PLAN,payload:{providerId:provider.id,tier:p.id}});
+          addToast(`Plan changed to ${p.name} (demo mode)!`, 'success');
+        }
+      } else {
+        // Demo/mock mode — just change locally
+        dispatch({type:ACTION_TYPES.UPGRADE_PLAN,payload:{providerId:provider.id,tier:p.id}});
+        addToast(`Plan changed to ${p.name}!`, 'success');
+      }
+    };
+
+    const handleManageBilling = async () => {
+      if (isStripeConfigured() && isSupabaseConfigured() && provider.id && !provider.id.startsWith('p')) {
+        try {
+          await openBillingPortal(provider.id);
+        } catch (err) {
+          addToast('Billing portal unavailable. Set up Stripe first.', 'error');
+        }
+      } else {
+        addToast('Billing portal requires Stripe setup.', 'info');
+      }
+    };
+
     return React.createElement('div', { style: { padding: responsive.isMobile ? '20px 16px' : '24px 32px' } },
       React.createElement('h2', { style: { fontSize: FONT_SIZES['2xl'], fontWeight: 800, color: c.text, marginBottom: '24px' } }, 'Subscription'),
 
@@ -3105,7 +3246,10 @@ function ProviderDashboard() {
             React.createElement('h3', { style: { fontSize: FONT_SIZES.xl, fontWeight: 800, color: c.text } }, plan.name),
             React.createElement('p', { style: { fontSize: FONT_SIZES.sm, color: c.textSecondary } }, plan.price === 0 ? 'Free' : `$${plan.price}/month`),
           ),
-          React.createElement(Badge, { variant: provider.tier, size: 'xs' }, provider.tier.charAt(0).toUpperCase() + provider.tier.slice(1)),
+          React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+            React.createElement(Badge, { variant: provider.tier, size: 'xs' }, provider.tier.charAt(0).toUpperCase() + provider.tier.slice(1)),
+            provider.tier !== 'starter' && React.createElement(Button, { variant: 'ghost', size: 'sm', onClick: handleManageBilling }, 'Manage Billing'),
+          ),
         ),
       ),
 
@@ -3129,7 +3273,7 @@ function ProviderDashboard() {
               React.createElement(Button, {
                 variant: PLANS.indexOf(p) > PLANS.findIndex(x => x.id === provider.tier) ? 'primary' : 'secondary',
                 size: 'sm', fullWidth: true,
-                onClick: () => { dispatch({type:ACTION_TYPES.UPGRADE_PLAN,payload:{providerId:provider.id,tier:p.id}}); addToast(`Plan changed to ${p.name}!`, 'success'); },
+                onClick: () => handleUpgrade(p),
               }, PLANS.indexOf(p) > PLANS.findIndex(x => x.id === provider.tier) ? 'Upgrade' : 'Downgrade'),
           ),
         )),
@@ -3167,6 +3311,12 @@ function ParticipantDashboard() {
   const tab = state.dashboardTab;
 
   const participant = state.participants.find(p => p.email === state.user?.email) || state.user;
+
+  // All useState hooks must be called unconditionally (React Rules of Hooks)
+  const [pSelectedId, setPSelectedId] = useState(null);
+  const [pReplyText, setPReplyText] = useState('');
+  const [pEditData, setPEditData] = useState(() => participant ? { name: participant.name, suburb: participant.suburb || '', phone: '' } : {});
+
   if (!participant) return React.createElement(EmptyState, { title: 'Not found' });
 
   const favourites = (participant.favourites || []).map(fId => state.providers.find(p => p.id === fId)).filter(Boolean);
@@ -3247,8 +3397,10 @@ function ParticipantDashboard() {
 
   // ── Enquiries ──
   if (tab === 'enquiries') {
-    const [selectedId, setSelectedId] = useState(null);
-    const [replyText, setReplyText] = useState('');
+    const selectedId = pSelectedId;
+    const setSelectedId = setPSelectedId;
+    const replyText = pReplyText;
+    const setReplyText = setPReplyText;
     const sel = myEnquiries.find(e => e.id === selectedId);
 
     return React.createElement('div', { style: { padding: responsive.isMobile ? '20px 16px' : '24px 32px' } },
@@ -3280,9 +3432,9 @@ function ParticipantDashboard() {
             )),
           ),
           sel.status === 'active' && React.createElement('div', { style: { display: 'flex', gap: '8px' } },
-            React.createElement('input', { value: replyText, onChange: e => setReplyText(e.target.value), placeholder: 'Type a reply...', onKeyDown: e => { if (e.key==='Enter' && replyText.trim()) { dispatch({type:ACTION_TYPES.REPLY_ENQUIRY,payload:{enquiryId:sel.id,text:replyText,from:'participant'}}); setReplyText(''); addToast('Reply sent!','success'); }},
+            React.createElement('input', { value: replyText, onChange: e => setReplyText(e.target.value), placeholder: 'Type a reply...', onKeyDown: e => { if (e.key==='Enter' && replyText.trim()) { dispatch({type:ACTION_TYPES.REPLY_ENQUIRY,payload:{enquiryId:sel.id,text:replyText,from:'participant'}}); db.replyEnquiry(sel.id,replyText,'participant'); setReplyText(''); addToast('Reply sent!','success'); }},
               style: { flex:1,padding:'10px 14px',background:c.surfaceAlt,border:`1px solid ${c.border}`,borderRadius:RADIUS.md,color:c.text,outline:'none',fontFamily:FONTS.sans,fontSize:FONT_SIZES.sm } }),
-            React.createElement(Button, { variant:'primary',size:'sm',onClick:() => { if (replyText.trim()) { dispatch({type:ACTION_TYPES.REPLY_ENQUIRY,payload:{enquiryId:sel.id,text:replyText,from:'participant'}}); setReplyText(''); addToast('Reply sent!','success'); }}, icon: Icons.send(16,'#fff') }),
+            React.createElement(Button, { variant:'primary',size:'sm',onClick:() => { if (replyText.trim()) { dispatch({type:ACTION_TYPES.REPLY_ENQUIRY,payload:{enquiryId:sel.id,text:replyText,from:'participant'}}); db.replyEnquiry(sel.id,replyText,'participant'); setReplyText(''); addToast('Reply sent!','success'); }}, icon: Icons.send(16,'#fff') }),
           ),
         ),
       ),
@@ -3307,7 +3459,7 @@ function ParticipantDashboard() {
           React.createElement('span', { style: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: FONT_SIZES.sm, color: c.textSecondary } }, Icons.clock(14), b.time),
         ),
         b.notes && React.createElement('p', { style: { fontSize: FONT_SIZES.xs, color: c.textMuted, marginTop: '8px' } }, b.notes),
-        b.status !== 'cancelled' && React.createElement(Button, { variant: 'ghost', size: 'sm', onClick: () => { dispatch({type:ACTION_TYPES.CANCEL_BOOKING,payload:b.id}); addToast('Booking cancelled','info'); }, style: { marginTop: '12px', color: COLORS.error } }, 'Cancel Booking'),
+        b.status !== 'cancelled' && React.createElement(Button, { variant: 'ghost', size: 'sm', onClick: () => { dispatch({type:ACTION_TYPES.CANCEL_BOOKING,payload:b.id}); db.updateBooking(b.id,{status:'cancelled'}); addToast('Booking cancelled','info'); }, style: { marginTop: '12px', color: COLORS.error } }, 'Cancel Booking'),
       )),
     ),
   );
@@ -3337,7 +3489,8 @@ function ParticipantDashboard() {
 
   // ── Settings ──
   if (tab === 'settings') {
-    const [editData, setEditData] = useState({ name: participant.name, suburb: participant.suburb || '', phone: '' });
+    const editData = pEditData;
+    const setEditData = setPEditData;
     return React.createElement('div', { style: { padding: responsive.isMobile ? '20px 16px' : '24px 32px', maxWidth: '600px' } },
       React.createElement('h2', { style: { fontSize: FONT_SIZES['2xl'], fontWeight: 800, color: c.text, marginBottom: '24px' } }, 'Settings'),
       React.createElement(Card, null,
@@ -3348,11 +3501,14 @@ function ParticipantDashboard() {
             React.createElement('p', { style: { fontSize: FONT_SIZES.sm, color: c.textMuted } }, participant.email),
           ),
         ),
-        React.createElement(Input, { label: 'Name', value: editData.name, onChange: v => setEditData(p=>({...p,name:v})) }),
-        React.createElement(Select, { label: 'Suburb', value: editData.suburb, onChange: v => setEditData(p=>({...p,suburb:v})),
+        React.createElement(Input, { label: 'Name', value: editData.name || '', onChange: v => setEditData(p=>({...p,name:v})) }),
+        React.createElement(Select, { label: 'Suburb', value: editData.suburb || '', onChange: v => setEditData(p=>({...p,suburb:v})),
           options: [{value:'',label:'Select'},...SUBURBS.map(s=>({value:s,label:s}))] }),
-        React.createElement(Button, { variant: 'primary', onClick: () => {
+        React.createElement(Button, { variant: 'primary', onClick: async () => {
           dispatch({type:ACTION_TYPES.UPDATE_PARTICIPANT_PROFILE,payload:{id:participant.id,...editData}});
+          if (isSupabaseConfigured() && participant.id && !participant.id.startsWith('u')) {
+            await db.updateParticipant(participant.id, editData);
+          }
           addToast('Profile updated!','success');
         } }, 'Save Changes'),
       ),
@@ -3374,11 +3530,15 @@ function AdminDashboard() {
   const c = COLORS[theme];
   const tab = state.dashboardTab;
 
+  // All useState hooks must be called unconditionally (React Rules of Hooks)
+  const [adminSearchTerm, setAdminSearchTerm] = useState('');
+  const [adminFilterRole, setAdminFilterRole] = useState('all');
+
   const totalProviders = state.providers.length;
   const totalParticipants = state.participants.length;
   const premiumCount = state.providers.filter(p => p.tier === 'premium').length;
-  const proCount = state.providers.filter(p => p.tier === 'pro').length;
-  const freeCount = state.providers.filter(p => p.tier === 'free').length;
+  const proCount = state.providers.filter(p => p.tier === 'professional').length;
+  const freeCount = state.providers.filter(p => p.tier === 'starter').length;
   const mrr = premiumCount * 149 + proCount * 49;
 
   const revenueData = ANALYTICS_MONTHS.map((m, i) => ({
@@ -3469,8 +3629,10 @@ function AdminDashboard() {
 
   // ── Users Tab ──
   if (tab === 'users') {
-    const [searchTerm, setSearchTerm] = useState('');
-    const [filterRole, setFilterRole] = useState('all');
+    const searchTerm = adminSearchTerm;
+    const setSearchTerm = setAdminSearchTerm;
+    const filterRole = adminFilterRole;
+    const setFilterRole = setAdminFilterRole;
     const allUsers = [
       ...state.providers.map(p => ({ ...p, role: 'provider' })),
       ...state.participants.map(p => ({ ...p, role: 'participant' })),
@@ -3634,6 +3796,53 @@ function App() {
   // Inject styles on mount
   useEffect(() => { injectStyles(); }, []);
 
+  // Load data from Supabase on mount
+  useEffect(() => {
+    async function loadDbData() {
+      if (!isSupabaseConfigured()) {
+        dispatch({ type: ACTION_TYPES.SET_LOADING, payload: false });
+        return;
+      }
+      try {
+        const [dbProviders, dbReviews, dbEnquiries, dbBookings] = await Promise.all([
+          db.fetchProviders(),
+          db.fetchReviews(),
+          db.fetchEnquiries(),
+          db.fetchBookings(),
+        ]);
+        if (dbProviders) dispatch({ type: ACTION_TYPES.SET_DB_PROVIDERS, payload: dbProviders });
+        if (dbReviews) dispatch({ type: ACTION_TYPES.SET_DB_REVIEWS, payload: dbReviews });
+        if (dbEnquiries) dispatch({ type: ACTION_TYPES.SET_DB_ENQUIRIES, payload: dbEnquiries });
+        if (dbBookings) dispatch({ type: ACTION_TYPES.SET_DB_BOOKINGS, payload: dbBookings });
+      } catch (err) {
+        console.error('Failed to load data from Supabase:', err);
+      }
+      dispatch({ type: ACTION_TYPES.SET_LOADING, payload: false });
+    }
+    loadDbData();
+  }, []);
+
+  // Handle Stripe checkout return
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('checkout') === 'success') {
+      const plan = params.get('plan');
+      // Clear URL params
+      window.history.replaceState({}, '', window.location.pathname);
+      // Reload provider data to get updated tier
+      if (isSupabaseConfigured() && state.user) {
+        db.fetchProviderByUserId(state.user.id).then(provider => {
+          if (provider) {
+            dispatch({ type: ACTION_TYPES.UPDATE_PROVIDER_PROFILE, payload: provider });
+            dispatch({ type: ACTION_TYPES.SET_USER, payload: { ...state.user, tier: provider.tier } });
+          }
+        });
+      }
+    } else if (params.get('checkout') === 'cancelled') {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
   // Supabase auth state listener
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
@@ -3645,9 +3854,18 @@ function App() {
         const { data: profile } = await supabase.from('user_profiles').select('*').eq('id', session.user.id).single();
         if (profile) {
           const role = profile.role || 'participant';
-          const user = { id: session.user.id, name: profile.name || session.user.email, email: session.user.email, role, tier: profile.tier || 'free' };
+          const user = { id: session.user.id, name: profile.name || session.user.email, email: session.user.email, role, tier: profile.tier || 'starter' };
           dispatch({ type: ACTION_TYPES.SET_USER, payload: user });
           dispatch({ type: ACTION_TYPES.NAV_GOTO, payload: { route: role === 'admin' ? 'admin-dashboard' : role === 'provider' ? 'provider-dashboard' : 'participant-dashboard' } });
+
+          // Load provider/participant record
+          if (role === 'provider') {
+            const dbProvider = await db.fetchProviderByUserId(session.user.id);
+            if (dbProvider) dispatch({ type: ACTION_TYPES.UPDATE_PROVIDER_PROFILE, payload: dbProvider });
+          } else if (role === 'participant') {
+            const dbParticipant = await db.fetchParticipant(session.user.id);
+            if (dbParticipant) dispatch({ type: ACTION_TYPES.UPDATE_PARTICIPANT_PROFILE, payload: dbParticipant });
+          }
         }
       }
     });
@@ -3679,8 +3897,10 @@ function App() {
   return React.createElement(ThemeContext.Provider, { value: { theme: themeState, toggle: toggleTheme } },
     React.createElement(AppContext.Provider, { value: { state: { ...state, theme: themeState }, dispatch } },
       React.createElement(ToastProvider, null,
-        React.createElement(PageShell, null,
-          React.createElement(AppRouter),
+        React.createElement(ErrorBoundary, null,
+          React.createElement(PageShell, null,
+            React.createElement(AppRouter),
+          ),
         ),
       ),
     ),
