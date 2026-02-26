@@ -22,17 +22,47 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Verify webhook signature
+    // Verify webhook signature manually (Stripe SDK async verification not reliable on Deno)
     const body = await req.text();
-    const signature = req.headers.get("stripe-signature")!;
-    const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET")!;
+    const signature = req.headers.get("stripe-signature") || "";
+    const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET") || "";
 
     let event: Stripe.Event;
-    try {
-      event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
-    } catch (err) {
-      console.error("Webhook signature verification failed:", err.message);
-      return new Response(JSON.stringify({ error: "Invalid signature" }), { status: 400 });
+
+    // Parse signature header
+    const sigParts: Record<string, string> = {};
+    for (const part of signature.split(",")) {
+      const [k, v] = part.split("=");
+      if (k && v) sigParts[k.trim()] = v.trim();
+    }
+
+    if (sigParts.t && sigParts.v1 && webhookSecret) {
+      // Compute expected signature
+      const encoder = new TextEncoder();
+      const key = await crypto.subtle.importKey(
+        "raw",
+        encoder.encode(webhookSecret),
+        { name: "HMAC", hash: "SHA-256" },
+        false,
+        ["sign"]
+      );
+      const signed = await crypto.subtle.sign(
+        "HMAC",
+        key,
+        encoder.encode(`${sigParts.t}.${body}`)
+      );
+      const expected = Array.from(new Uint8Array(signed))
+        .map(b => b.toString(16).padStart(2, "0"))
+        .join("");
+
+      if (expected !== sigParts.v1) {
+        console.error("Webhook signature mismatch");
+        return new Response(JSON.stringify({ error: "Invalid signature" }), { status: 400 });
+      }
+      event = JSON.parse(body) as Stripe.Event;
+    } else {
+      console.error("Missing signature or webhook secret");
+      return new Response(JSON.stringify({ error: "Missing signature" }), { status: 400 });
     }
 
     console.log("Stripe event:", event.type);
