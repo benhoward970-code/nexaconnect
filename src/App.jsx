@@ -1928,8 +1928,8 @@ function Sidebar() {
 
   const sidebarContent = React.createElement('div', {
     style: {
-      width: isOpen ? '240px' : '0px', height: 'calc(100vh - 64px)', position: 'fixed',
-      top: '64px', left: 0, background: c.surface, borderRight: `1px solid ${c.border}`,
+      width: isOpen ? '240px' : '0px', height: 'calc(100vh - 120px)', position: 'fixed',
+      top: '120px', left: 0, background: c.surface, borderRight: `1px solid ${c.border}`,
       transition: 'width 0.3s ease', overflow: 'hidden', zIndex: 50,
       display: 'flex', flexDirection: 'column',
     },
@@ -2062,8 +2062,8 @@ function PageShell({ children }) {
     showSidebar && React.createElement(Sidebar),
     React.createElement('main', {
       style: {
-        marginTop: '64px', marginLeft: sidebarWidth,
-        transition: 'margin-left 0.3s', minHeight: 'calc(100vh - 64px)',
+        marginTop: '120px', marginLeft: sidebarWidth,
+        transition: 'margin-left 0.3s', minHeight: 'calc(100vh - 120px)',
         animation: 'nc-fadeIn 0.4s ease',
       },
     }, children),
@@ -2111,7 +2111,7 @@ function LandingPage() {
       style: {
         position: 'relative', overflow: 'hidden', minHeight: responsive.isMobile ? '85vh' : '90vh',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: responsive.isMobile ? '80px 20px 40px' : '130px 40px',
+        padding: responsive.isMobile ? '140px 20px 40px' : '140px 40px',
       },
     },
       // Background gradient
@@ -2525,7 +2525,7 @@ function LoginPage() {
   return React.createElement('div', {
     style: {
       minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      padding: '130px 20px 40px',
+      padding: '140px 20px 40px',
     },
   },
     React.createElement(Card, {
@@ -2673,7 +2673,7 @@ function RegisterPage() {
   };
 
   return React.createElement('div', {
-    style: { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '130px 20px 40px' },
+    style: { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '140px 20px 40px' },
   },
     React.createElement(Card, {
       style: { width: '100%', maxWidth: '480px', padding: '40px 32px', animation: 'nc-fadeIn 0.5s ease' },
@@ -2968,7 +2968,7 @@ function DirectoryPage() {
 
   const activeFilterCount = Object.values(state.searchFilters).filter(v => v && v !== 0 && v !== false).length;
 
-  return React.createElement('div', { style: { padding: responsive.isMobile ? '80px 16px 40px' : '80px 32px 40px', maxWidth: '1400px', margin: '0 auto' } },
+  return React.createElement('div', { style: { padding: responsive.isMobile ? '140px 16px 40px' : '140px 32px 40px', maxWidth: '1400px', margin: '0 auto' } },
     // Header
     React.createElement('div', { style: { marginBottom: '24px' } },
       React.createElement('h1', { style: { fontSize: FONT_SIZES['2xl'], fontWeight: 800, color: c.text, marginBottom: '8px' } }, 'Browse Providers'),
@@ -3000,8 +3000,8 @@ function DirectoryPage() {
       showFilters && React.createElement(Card, {
         style: {
           width: responsive.isMobile ? '100%' : '260px', flexShrink: 0, padding: '20px',
-          position: responsive.isMobile ? 'static' : 'sticky', top: '88px', alignSelf: 'flex-start',
-          maxHeight: responsive.isMobile ? 'none' : 'calc(100vh - 100px)', overflowY: 'auto',
+          position: responsive.isMobile ? 'static' : 'sticky', top: '140px', alignSelf: 'flex-start',
+          maxHeight: responsive.isMobile ? 'none' : 'calc(100vh - 160px)', overflowY: 'auto',
         },
       },
         React.createElement('h3', { style: { fontSize: FONT_SIZES.base, fontWeight: 700, color: c.text, marginBottom: '16px' } }, 'Filters'),
@@ -3142,7 +3142,7 @@ function ProviderProfilePage() {
     addToast('Review submitted!', 'success');
   };
 
-  return React.createElement('div', { style: { padding: responsive.isMobile ? '80px 16px 40px' : '80px 32px 40px', maxWidth: '1000px', margin: '0 auto' } },
+  return React.createElement('div', { style: { padding: responsive.isMobile ? '140px 16px 40px' : '140px 32px 40px', maxWidth: '1000px', margin: '0 auto' } },
     // Back button
     React.createElement(Button, { variant: 'ghost', size: 'sm', onClick: () => dispatch({type:ACTION_TYPES.NAV_BACK}), icon: Icons.arrowLeft(16), style: { marginBottom: '16px' } }, 'Back'),
 
@@ -4895,7 +4895,7 @@ function InfoPage({ pageKey }) {
 
   return React.createElement(Fragment, null,
     React.createElement('div', {
-      style: { padding: responsive.isMobile ? '80px 20px 60px' : '100px 40px 80px', maxWidth: '800px', margin: '0 auto' },
+      style: { padding: responsive.isMobile ? '140px 20px 60px' : '140px 40px 80px', maxWidth: '800px', margin: '0 auto' },
     },
       React.createElement('button', {
         onClick: () => dispatch({type:ACTION_TYPES.NAV_BACK}),
@@ -4934,7 +4934,7 @@ function NDISCodeOfConductPage() {
     { number: '7', title: 'Prevent and respond to sexual misconduct', description: 'Take all reasonable steps to prevent and respond to sexual misconduct.', examples: 'Maintain professional boundaries at all times. Never engage in sexual conduct with a participant in your care. Report any sexual misconduct by others immediately to the NDIS Commission and police.' },
   ];
   return React.createElement(Fragment, null,
-    React.createElement('div', { style: { padding: responsive.isMobile ? '80px 20px 60px' : '100px 40px 80px', maxWidth: '900px', margin: '0 auto' } },
+    React.createElement('div', { style: { padding: responsive.isMobile ? '140px 20px 60px' : '140px 40px 80px', maxWidth: '900px', margin: '0 auto' } },
       React.createElement('button', { onClick: () => dispatch({ type: ACTION_TYPES.NAV_BACK }), style: { display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', color: c.textSecondary, fontFamily: FONTS.sans, fontSize: FONT_SIZES.sm, fontWeight: 600, marginBottom: '24px' } }, Icons.arrowLeft(16), 'Back'),
       React.createElement('h1', { style: { fontSize: responsive.isMobile ? FONT_SIZES['2xl'] : FONT_SIZES['3xl'], fontWeight: 800, color: c.text, marginBottom: '12px' } }, 'NDIS Code of Conduct'),
       React.createElement('p', { style: { color: c.textSecondary, fontSize: FONT_SIZES.md, lineHeight: 1.7, marginBottom: SPACING.xl } }, 'The NDIS Code of Conduct is established under section 123A of the National Disability Insurance Scheme Act 2013 (Cth). It sets expectations for all NDIS providers and workers. All providers listed on NexaConnect are required to comply with the Code.'),
@@ -5007,7 +5007,7 @@ function ComplaintsPage() {
     { icon: Icons.mapPin, label: 'Post', detail: 'Complaints Officer, NexaConnect Pty Ltd', sub: 'Level 2, 45 Hunter Street, Newcastle NSW 2300' },
   ];
   return React.createElement(Fragment, null,
-    React.createElement('div', { style: { padding: responsive.isMobile ? '80px 20px 60px' : '100px 40px 80px', maxWidth: '900px', margin: '0 auto' } },
+    React.createElement('div', { style: { padding: responsive.isMobile ? '140px 20px 60px' : '140px 40px 80px', maxWidth: '900px', margin: '0 auto' } },
       React.createElement('button', { onClick: () => dispatch({ type: ACTION_TYPES.NAV_BACK }), style: { display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', color: c.textSecondary, fontFamily: FONTS.sans, fontSize: FONT_SIZES.sm, fontWeight: 600, marginBottom: '24px' } }, Icons.arrowLeft(16), 'Back'),
       React.createElement('h1', { style: { fontSize: responsive.isMobile ? FONT_SIZES['2xl'] : FONT_SIZES['3xl'], fontWeight: 800, color: c.text, marginBottom: '12px' } }, 'Complaints and Feedback'),
       React.createElement('p', { style: { color: c.textSecondary, fontSize: FONT_SIZES.md, lineHeight: 1.7, marginBottom: SPACING.xl } }, 'NexaConnect takes all complaints seriously. Your feedback helps us maintain a safe, high-quality marketplace for NDIS participants and providers.'),
