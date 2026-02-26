@@ -43,14 +43,14 @@ serve(async (req) => {
 
     const { providerId, returnUrl } = await req.json();
 
-    // Get Stripe customer ID
-    const { data: provider } = await supabase
-      .from("providers")
+    // Get Stripe customer ID from provider_billing
+    const { data: billing } = await supabase
+      .from("provider_billing")
       .select("stripe_customer_id")
-      .eq("id", providerId)
+      .eq("provider_id", providerId)
       .single();
 
-    if (!provider?.stripe_customer_id) {
+    if (!billing?.stripe_customer_id) {
       return new Response(JSON.stringify({ error: "No Stripe customer found. Subscribe to a plan first." }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -58,7 +58,7 @@ serve(async (req) => {
     }
 
     const portalSession = await stripe.billingPortals.sessions.create({
-      customer: provider.stripe_customer_id,
+      customer: billing.stripe_customer_id,
       return_url: returnUrl,
     });
 

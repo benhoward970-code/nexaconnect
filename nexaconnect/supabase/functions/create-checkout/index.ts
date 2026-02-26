@@ -44,14 +44,21 @@ serve(async (req) => {
 
     const { providerId, priceId, planName, billingCycle, returnUrl } = await req.json();
 
-    // Get or create Stripe customer
+    // Get provider info
     const { data: provider } = await supabase
       .from("providers")
-      .select("stripe_customer_id, email, name")
+      .select("email, name")
       .eq("id", providerId)
       .single();
 
-    let customerId = provider?.stripe_customer_id;
+    // Get Stripe customer ID from provider_billing
+    const { data: billing } = await supabase
+      .from("provider_billing")
+      .select("stripe_customer_id")
+      .eq("provider_id", providerId)
+      .single();
+
+    let customerId = billing?.stripe_customer_id;
 
     if (!customerId) {
       const customer = await stripe.customers.create({
@@ -61,11 +68,14 @@ serve(async (req) => {
       });
       customerId = customer.id;
 
-      // Save Stripe customer ID
+      // Save Stripe customer ID to provider_billing
       await supabase
-        .from("providers")
-        .update({ stripe_customer_id: customerId })
-        .eq("id", providerId);
+        .from("provider_billing")
+        .upsert({
+          provider_id: providerId,
+          user_id: user.id,
+          stripe_customer_id: customerId,
+        }, { onConflict: "provider_id" });
     }
 
     // Create checkout session

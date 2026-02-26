@@ -56,11 +56,17 @@ serve(async (req) => {
           const tier = getTierFromPlan(planName);
           const verified = tier === "premium";
 
+          // Update tier on providers table
           await supabase.from("providers").update({
             tier,
             verified,
-            stripe_subscription_id: session.subscription as string,
           }).eq("id", providerId);
+
+          // Save subscription ID to provider_billing
+          await supabase.from("provider_billing").upsert({
+            provider_id: providerId,
+            stripe_subscription_id: session.subscription as string,
+          }, { onConflict: "provider_id" });
 
           console.log(`Provider ${providerId} upgraded to ${tier}`);
         }
@@ -93,8 +99,12 @@ serve(async (req) => {
           await supabase.from("providers").update({
             tier: "starter",
             verified: false,
-            stripe_subscription_id: null,
           }).eq("id", providerId);
+
+          // Clear subscription ID from billing
+          await supabase.from("provider_billing").update({
+            stripe_subscription_id: null,
+          }).eq("provider_id", providerId);
 
           console.log(`Provider ${providerId} downgraded to starter (subscription cancelled)`);
         }
