@@ -39,6 +39,9 @@ export async function redirectToCheckout({ providerId, priceId, planName, billin
       billingCycle,
       returnUrl: window.location.origin,
     },
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+    },
   });
 
   if (error) {
@@ -75,6 +78,9 @@ export async function openBillingPortal(providerId) {
     body: {
       providerId,
       returnUrl: window.location.origin,
+    },
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
     },
   });
 
