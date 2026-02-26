@@ -3853,8 +3853,12 @@ function ProviderDashboard() {
         addToast(`Plan changed to ${p.name}!`, 'success');
         return;
       }
+      const stripeOk = isStripeConfigured();
+      const supaOk = isSupabaseConfigured();
+      const realProvider = provider.id && !provider.id.startsWith('p');
+      console.log('Checkout debug:', { stripeOk, supaOk, realProvider, providerId: provider.id, priceId: state.billingCycle === 'annual' ? p.stripePriceIdYearly : p.stripePriceIdMonthly });
       // If Stripe is configured and this is a real (non-mock) provider, use Stripe checkout
-      if (isStripeConfigured() && isSupabaseConfigured() && provider.id && !provider.id.startsWith('p')) {
+      if (stripeOk && supaOk && realProvider) {
         try {
           addToast('Redirecting to checkout...', 'info');
           await redirectToCheckout({
@@ -3868,9 +3872,7 @@ function ProviderDashboard() {
           addToast(`Checkout error: ${err.message || 'Unknown error'}`, 'error');
         }
       } else {
-        // Demo/mock mode — just change locally
-        dispatch({type:ACTION_TYPES.UPGRADE_PLAN,payload:{providerId:provider.id,tier:p.id}});
-        addToast(`Plan changed to ${p.name}!`, 'success');
+        addToast(`Debug: stripe=${stripeOk} supa=${supaOk} real=${realProvider} id=${provider.id}`, 'error');
       }
     };
 
