@@ -2479,11 +2479,14 @@ function LoginPage() {
 
   const handleLogin = async () => {
     setError('');
-    // Always check demo accounts first
-    if (demoLogin()) return;
+    // Use demo login only when Supabase is not configured (pure demo mode)
+    if (!isSupabaseConfigured()) {
+      if (demoLogin()) return;
+      setError('Invalid email or password. Try sunshine@provider.com.au / password');
+      return;
+    }
 
-    // Try Supabase auth if configured
-    if (isSupabaseConfigured()) {
+    // Supabase auth
       setLoading(true);
       try {
         const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
@@ -2518,10 +2521,6 @@ function LoginPage() {
         setError('Login failed. Please try again.');
       }
       setLoading(false);
-      return;
-    }
-
-    setError('Invalid email or password. Try sunshine@provider.com.au / password');
   };
 
   return React.createElement('div', {
