@@ -1250,9 +1250,11 @@ const PLANS = [
     features:['Basic listing','200-character description','5 enquiries per month','Standard search placement','Email support'],
     limits:{ descLength:200, enquiriesPerMonth:5, photos:0, analytics:false, directBooking:false, verified:false, promoted:false }},
   { id:'professional',name:'Professional',price:49,priceAnnual:39,popular:true,
+    stripePriceIdMonthly:'price_1T4xNQBbYMwhcgg97GpcozvG',stripePriceIdYearly:'price_1T4xPHBbYMwhcgg9GSdDpsON',
     features:['Featured placement','Full profile with photos','Unlimited enquiries','Analytics dashboard','Priority email support','Review responses','Up to 10 photos'],
     limits:{ descLength:2000, enquiriesPerMonth:Infinity, photos:10, analytics:true, directBooking:false, verified:false, promoted:false }},
   { id:'premium',name:'Premium',price:149,priceAnnual:119,popular:false,
+    stripePriceIdMonthly:'price_1T4xQIBbYMwhcgg9gLXhv8dG',stripePriceIdYearly:'price_1T4xQnBbYMwhcgg9YJvx5b50',
     features:['Top search placement','Verified provider badge','Direct booking system','Lead generation tools','Promoted listings','Dedicated account manager','Unlimited photos','Full analytics suite'],
     limits:{ descLength:5000, enquiriesPerMonth:Infinity, photos:Infinity, analytics:true, directBooking:true, verified:true, promoted:true }},
 ];
@@ -3858,15 +3860,13 @@ function ProviderDashboard() {
           addToast('Redirecting to checkout...', 'info');
           await redirectToCheckout({
             providerId: provider.id,
-            priceId: p.stripePriceId, // Set in Stripe Dashboard
+            priceId: state.billingCycle === 'annual' ? p.stripePriceIdYearly : p.stripePriceIdMonthly,
             planName: p.id,
             billingCycle: state.billingCycle,
           });
         } catch (err) {
-          addToast('Checkout unavailable. Set up Stripe products first.', 'error');
-          // Fall back to local plan change for demo
-          dispatch({type:ACTION_TYPES.UPGRADE_PLAN,payload:{providerId:provider.id,tier:p.id}});
-          addToast(`Plan changed to ${p.name} (demo mode)!`, 'success');
+          console.error('Checkout error:', err);
+          addToast(`Checkout error: ${err.message || 'Unknown error'}`, 'error');
         }
       } else {
         // Demo/mock mode — just change locally
