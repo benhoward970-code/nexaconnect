@@ -1506,8 +1506,22 @@ function Navbar() {
   const { state, dispatch } = useApp();
   const responsive = useResponsive();
   const c = COLORS[theme];
-  const isMarketing = ['landing','pricing','login','register','directory','provider-profile'].includes(state.route);
+  const isMarketing = ['landing','pricing','login','register','directory','provider-profile','help','contact','ndis-resources','about','privacy','terms'].includes(state.route);
   const isLoggedIn = !!state.user;
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const dropdownRef = useRef(null);
+  useEffect(() => {
+    if (!showUserDropdown) return;
+    const handleClickOutside = (e) => { if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setShowUserDropdown(false); };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showUserDropdown]);
+  const hasNotifications = isLoggedIn && (() => {
+    if (state.user.role === 'admin') return true;
+    const prov = state.user.role === 'provider' ? state.providers.find(p => p.email === state.user.email) : null;
+    return state.enquiries.some(e => e.status === 'active' && (prov ? e.providerId === prov.id : e.participantId === state.user.id))
+      || state.bookings.some(b => b.status === 'pending' && (prov ? b.providerId === prov.id : b.participantId === state.user.id));
+  })();
 
   return React.createElement('nav', {
     style: {
@@ -1542,7 +1556,7 @@ function Navbar() {
     !responsive.isMobile && isMarketing && React.createElement('div', { style: { display: 'flex', gap: '32px', alignItems: 'center' } },
       ['Directory','Pricing','About'].map(item => React.createElement('button', {
         key: item,
-        onClick: () => dispatch({type:ACTION_TYPES.NAV_GOTO,payload:{route: item === 'About' ? 'landing' : item.toLowerCase()}}),
+        onClick: () => dispatch({type:ACTION_TYPES.NAV_GOTO,payload:{route: item.toLowerCase()}}),
         style: { background: 'none', border: 'none', color: c.textSecondary, cursor: 'pointer',
           fontSize: FONT_SIZES.sm, fontWeight: 600, fontFamily: FONTS.sans, transition: 'color 0.2s' },
         onMouseEnter: (e) => e.target.style.color = COLORS.primary[500],
@@ -1573,21 +1587,58 @@ function Navbar() {
 
       isLoggedIn && React.createElement(Fragment, null,
         React.createElement('button', {
+          onClick: () => {
+            const role = state.user.role;
+            const route = role === 'admin' ? 'admin-dashboard' : role === 'provider' ? 'provider-dashboard' : 'participant-dashboard';
+            const tab = role === 'admin' ? 'activity' : role === 'provider' ? 'inbox' : 'enquiries';
+            dispatch({type:ACTION_TYPES.NAV_GOTO,payload:{route}});
+            dispatch({type:ACTION_TYPES.SET_DASHBOARD_TAB,payload:tab});
+          },
           style: { background:'none',border:'none',cursor:'pointer',color:c.textSecondary,display:'flex',position:'relative',padding:'6px' },
         }, Icons.bell(18),
-          React.createElement('span', { style: {
+          hasNotifications && React.createElement('span', { style: {
             position:'absolute',top:2,right:2,width:8,height:8,borderRadius:'50%',background:COLORS.error,
           } }),
         ),
         React.createElement('div', {
-          onClick: () => {
-            const route = state.user.role === 'admin' ? 'admin-dashboard' : state.user.role === 'provider' ? 'provider-dashboard' : 'participant-dashboard';
-            dispatch({type:ACTION_TYPES.NAV_GOTO,payload:{route}});
-          },
-          style: { cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' },
+          ref: dropdownRef,
+          style: { position: 'relative' },
         },
-          React.createElement(Avatar, { name: state.user.name, size: 32 }),
-          !responsive.isMobile && React.createElement('span', { style: { fontSize: FONT_SIZES.sm, fontWeight: 600, color: c.text } }, state.user.name),
+          React.createElement('div', {
+            onClick: () => setShowUserDropdown(!showUserDropdown),
+            style: { cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' },
+          },
+            React.createElement(Avatar, { name: state.user.name, size: 32 }),
+            !responsive.isMobile && React.createElement('span', { style: { fontSize: FONT_SIZES.sm, fontWeight: 600, color: c.text } }, state.user.name),
+            Icons.chevronDown(14, c.textSecondary),
+          ),
+          showUserDropdown && React.createElement('div', {
+            style: {
+              position: 'absolute', top: '100%', right: 0, marginTop: '8px',
+              minWidth: '180px', background: c.surface, border: `1px solid ${c.border}`,
+              borderRadius: RADIUS.md, boxShadow: c.cardShadow, overflow: 'hidden', zIndex: 200,
+            },
+          },
+            React.createElement('button', {
+              onClick: () => { const route = state.user.role === 'admin' ? 'admin-dashboard' : state.user.role === 'provider' ? 'provider-dashboard' : 'participant-dashboard'; dispatch({type:ACTION_TYPES.NAV_GOTO,payload:{route}}); dispatch({type:ACTION_TYPES.SET_DASHBOARD_TAB,payload:'overview'}); setShowUserDropdown(false); },
+              style: { width:'100%',display:'flex',alignItems:'center',gap:'8px',padding:'10px 14px',background:'none',border:'none',cursor:'pointer',color:c.text,fontFamily:FONTS.sans,fontSize:FONT_SIZES.sm,fontWeight:600,textAlign:'left' },
+              onMouseEnter: (e) => e.currentTarget.style.background = c.surfaceHover,
+              onMouseLeave: (e) => e.currentTarget.style.background = 'none',
+            }, Icons.home(16, c.textSecondary), 'Dashboard'),
+            React.createElement('button', {
+              onClick: () => { const route = state.user.role === 'admin' ? 'admin-dashboard' : state.user.role === 'provider' ? 'provider-dashboard' : 'participant-dashboard'; dispatch({type:ACTION_TYPES.NAV_GOTO,payload:{route}}); dispatch({type:ACTION_TYPES.SET_DASHBOARD_TAB,payload: state.user.role === 'provider' ? 'profile-edit' : state.user.role === 'participant' ? 'settings' : 'users'}); setShowUserDropdown(false); },
+              style: { width:'100%',display:'flex',alignItems:'center',gap:'8px',padding:'10px 14px',background:'none',border:'none',cursor:'pointer',color:c.text,fontFamily:FONTS.sans,fontSize:FONT_SIZES.sm,fontWeight:600,textAlign:'left' },
+              onMouseEnter: (e) => e.currentTarget.style.background = c.surfaceHover,
+              onMouseLeave: (e) => e.currentTarget.style.background = 'none',
+            }, Icons.settings(16, c.textSecondary), 'Settings'),
+            React.createElement('div', { style: { height:'1px',background:c.border,margin:'4px 0' } }),
+            React.createElement('button', {
+              onClick: () => { if (isSupabaseConfigured()) supabase.auth.signOut(); dispatch({type:ACTION_TYPES.LOGOUT}); setShowUserDropdown(false); },
+              style: { width:'100%',display:'flex',alignItems:'center',gap:'8px',padding:'10px 14px',background:'none',border:'none',cursor:'pointer',color:COLORS.error,fontFamily:FONTS.sans,fontSize:FONT_SIZES.sm,fontWeight:600,textAlign:'left' },
+              onMouseEnter: (e) => e.currentTarget.style.background = c.surfaceHover,
+              onMouseLeave: (e) => e.currentTarget.style.background = 'none',
+            }, Icons.logout(16, COLORS.error), 'Log Out'),
+          ),
         ),
       ),
     ),
@@ -1601,7 +1652,7 @@ function Sidebar() {
   const c = COLORS[theme];
 
   if (!state.user) return null;
-  const isMarketing = ['landing','pricing','login','register','directory','provider-profile'].includes(state.route);
+  const isMarketing = ['landing','pricing','login','register','directory','provider-profile','help','contact','ndis-resources','about','privacy','terms'].includes(state.route);
   if (isMarketing) return null;
 
   const role = state.user.role;
@@ -1734,8 +1785,8 @@ function Footer() {
         // Links columns
         ...[
           { title: 'Platform', links: [['Browse Providers','directory'],['Pricing','pricing'],['For Providers','register']] },
-          { title: 'Support', links: [['Help Centre','landing'],['Contact Us','landing'],['NDIS Resources','landing']] },
-          { title: 'Company', links: [['About','landing'],['Privacy Policy','landing'],['Terms of Service','landing']] },
+          { title: 'Support', links: [['Help Centre','help'],['Contact Us','contact'],['NDIS Resources','ndis-resources']] },
+          { title: 'Company', links: [['About','about'],['Privacy Policy','privacy'],['Terms of Service','terms']] },
         ].map((col, i) => React.createElement('div', { key: i },
           React.createElement('h4', { style: { color: c.text, fontSize: FONT_SIZES.sm, fontWeight: 700, marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' } }, col.title),
           ...col.links.map(([label, route], j) => React.createElement('button', {
@@ -1759,7 +1810,7 @@ function PageShell({ children }) {
   const { state } = useApp();
   const responsive = useResponsive();
   const c = COLORS[theme];
-  const isMarketing = ['landing','pricing','login','register','directory','provider-profile'].includes(state.route);
+  const isMarketing = ['landing','pricing','login','register','directory','provider-profile','help','contact','ndis-resources','about','privacy','terms'].includes(state.route);
   const showSidebar = state.user && !isMarketing;
   const sidebarWidth = showSidebar && state.sidebarOpen && !responsive.isMobile ? 240 : 0;
 
@@ -1799,12 +1850,12 @@ function LandingPage() {
   ];
 
   const FEATURES = [
-    { icon: Icons.search, title: 'Smart Search', desc: 'Find providers by service type, location, availability, and more with our intelligent search.' },
-    { icon: Icons.shield, title: 'Verified Providers', desc: 'Premium providers are verified for quality, giving you peace of mind.' },
-    { icon: Icons.star, title: 'Real Reviews', desc: 'Read genuine reviews from other NDIS participants to make informed decisions.' },
-    { icon: Icons.calendar, title: 'Direct Booking', desc: 'Book appointments directly with Premium providers, no phone tag needed.' },
-    { icon: Icons.barChart, title: 'Provider Analytics', desc: 'Providers get powerful insights to understand and grow their business.' },
-    { icon: Icons.zap, title: 'Instant Connect', desc: 'Send enquiries directly to providers and get responses within hours.' },
+    { icon: Icons.search, title: 'Smart Search', desc: 'Find providers by service type, location, availability, and more with our intelligent search.', route: 'directory' },
+    { icon: Icons.shield, title: 'Verified Providers', desc: 'Premium providers are verified for quality, giving you peace of mind.', route: 'directory' },
+    { icon: Icons.star, title: 'Real Reviews', desc: 'Read genuine reviews from other NDIS participants to make informed decisions.', route: 'directory' },
+    { icon: Icons.calendar, title: 'Direct Booking', desc: 'Book appointments directly with Premium providers, no phone tag needed.', route: 'register' },
+    { icon: Icons.barChart, title: 'Provider Analytics', desc: 'Providers get powerful insights to understand and grow their business.', route: 'register' },
+    { icon: Icons.zap, title: 'Instant Connect', desc: 'Send enquiries directly to providers and get responses within hours.', route: 'register' },
   ];
 
   const HOW_IT_WORKS = [
@@ -1899,7 +1950,8 @@ function LandingPage() {
         },
           FEATURES.map((f, i) => React.createElement(Card, {
             key: i, hover: true, glass: true,
-            style: { animation: `nc-fadeInUp ${0.3 + i * 0.1}s ease forwards`, opacity: 0 },
+            onClick: () => dispatch({type:ACTION_TYPES.NAV_GOTO,payload:{route:f.route}}),
+            style: { animation: `nc-fadeInUp ${0.3 + i * 0.1}s ease forwards`, opacity: 0, cursor: 'pointer' },
           },
             React.createElement('div', {
               style: { width: 48, height: 48, borderRadius: RADIUS.md, background: COLORS.gradientCard,
@@ -2715,9 +2767,19 @@ function ProviderProfilePage() {
           ),
           React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '16px', marginTop: '8px', flexWrap: 'wrap' } },
             React.createElement('span', { style: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: FONT_SIZES.sm, color: c.textSecondary } }, Icons.mapPin(14), provider.suburb + ', ' + provider.state),
-            React.createElement('span', { style: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: FONT_SIZES.sm, color: c.textSecondary } }, Icons.phone(14), provider.phone),
+            React.createElement('a', { href: 'tel:' + provider.phone, style: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: FONT_SIZES.sm, color: c.textSecondary, textDecoration: 'none' } }, Icons.phone(14), provider.phone),
+            provider.website && React.createElement('a', {
+              href: provider.website.startsWith('http') ? provider.website : 'https://' + provider.website,
+              target: '_blank', rel: 'noopener noreferrer',
+              style: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: FONT_SIZES.sm, color: COLORS.primary[500], textDecoration: 'none' },
+            }, Icons.globe(14), 'Website'),
             React.createElement(StarRating, { rating: provider.rating, size: 14, showValue: true }),
-            React.createElement('span', { style: { fontSize: FONT_SIZES.sm, color: c.textMuted } }, `(${provider.reviewCount} reviews)`),
+            React.createElement('button', {
+              onClick: () => setActiveTab('reviews'),
+              style: { background:'none',border:'none',cursor:'pointer',fontSize: FONT_SIZES.sm, color: c.textMuted, fontFamily: FONTS.sans, padding: 0 },
+              onMouseEnter: (e) => e.target.style.textDecoration = 'underline',
+              onMouseLeave: (e) => e.target.style.textDecoration = 'none',
+            }, `(${provider.reviewCount} reviews)`),
           ),
         ),
         React.createElement('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
@@ -2925,8 +2987,20 @@ function ProviderDashboard() {
     React.createElement('div', { style: { display: 'grid', gridTemplateColumns: responsive.isMobile ? '1fr' : 'repeat(2, 1fr)', gap: '24px' } },
       // Recent Enquiries
       React.createElement(Card, null,
-        React.createElement('h3', { style: { fontSize: FONT_SIZES.lg, fontWeight: 700, color: c.text, marginBottom: '16px' } }, 'Recent Enquiries'),
-        myEnquiries.slice(0, 3).map(e => React.createElement('div', { key: e.id, style: { display: 'flex', gap: '10px', padding: '10px 0', borderBottom: `1px solid ${c.border}` } },
+        React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' } },
+          React.createElement('h3', { style: { fontSize: FONT_SIZES.lg, fontWeight: 700, color: c.text } }, 'Recent Enquiries'),
+          myEnquiries.length > 0 && React.createElement('button', {
+            onClick: () => dispatch({type:ACTION_TYPES.SET_DASHBOARD_TAB,payload:'inbox'}),
+            style: { background:'none',border:'none',cursor:'pointer',color:COLORS.primary[500],fontFamily:FONTS.sans,fontSize:FONT_SIZES.sm,fontWeight:600 },
+          }, 'View All \u2192'),
+        ),
+        myEnquiries.slice(0, 3).map(e => React.createElement('div', {
+          key: e.id,
+          onClick: () => { dispatch({type:ACTION_TYPES.SET_DASHBOARD_TAB,payload:'inbox'}); setSelectedEnquiry(e.id); },
+          style: { display: 'flex', gap: '10px', padding: '10px 0', borderBottom: `1px solid ${c.border}`, cursor: 'pointer', borderRadius: RADIUS.sm, transition: 'background 0.2s' },
+          onMouseEnter: (ev) => ev.currentTarget.style.background = c.surfaceHover,
+          onMouseLeave: (ev) => ev.currentTarget.style.background = 'transparent',
+        },
           React.createElement(Avatar, { name: e.participantName, size: 32 }),
           React.createElement('div', { style: { flex: 1 } },
             React.createElement('p', { style: { fontSize: FONT_SIZES.sm, fontWeight: 600, color: c.text } }, e.participantName),
@@ -2938,8 +3012,20 @@ function ProviderDashboard() {
       ),
       // Recent Reviews
       React.createElement(Card, null,
-        React.createElement('h3', { style: { fontSize: FONT_SIZES.lg, fontWeight: 700, color: c.text, marginBottom: '16px' } }, 'Recent Reviews'),
-        myReviews.slice(0, 3).map(r => React.createElement('div', { key: r.id, style: { padding: '10px 0', borderBottom: `1px solid ${c.border}` } },
+        React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' } },
+          React.createElement('h3', { style: { fontSize: FONT_SIZES.lg, fontWeight: 700, color: c.text } }, 'Recent Reviews'),
+          myReviews.length > 0 && React.createElement('button', {
+            onClick: () => dispatch({type:ACTION_TYPES.SET_DASHBOARD_TAB,payload:'reviews'}),
+            style: { background:'none',border:'none',cursor:'pointer',color:COLORS.primary[500],fontFamily:FONTS.sans,fontSize:FONT_SIZES.sm,fontWeight:600 },
+          }, 'View All \u2192'),
+        ),
+        myReviews.slice(0, 3).map(r => React.createElement('div', {
+          key: r.id,
+          onClick: () => dispatch({type:ACTION_TYPES.SET_DASHBOARD_TAB,payload:'reviews'}),
+          style: { padding: '10px 0', borderBottom: `1px solid ${c.border}`, cursor: 'pointer', borderRadius: RADIUS.sm, transition: 'background 0.2s' },
+          onMouseEnter: (ev) => ev.currentTarget.style.background = c.surfaceHover,
+          onMouseLeave: (ev) => ev.currentTarget.style.background = 'transparent',
+        },
           React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '4px' } },
             React.createElement('span', { style: { fontSize: FONT_SIZES.sm, fontWeight: 600, color: c.text } }, r.participantName),
             React.createElement(StarRating, { rating: r.rating, size: 12 }),
@@ -3610,19 +3696,28 @@ function AdminDashboard() {
       React.createElement(Card, null,
         React.createElement('h3', { style: { fontSize: FONT_SIZES.base, fontWeight: 700, color: c.text, marginBottom: '16px' } }, 'Recent Activity'),
         [
-          { text: 'New provider registered: Sunshine Support', time: '2 hours ago', type: 'info' },
-          { text: 'Premium upgrade: PhysioPlus Disability', time: '4 hours ago', type: 'success' },
-          { text: 'New review submitted for MindBridge', time: '6 hours ago', type: 'info' },
+          { text: 'New provider registered: Sunshine Support', time: '2 hours ago', type: 'info', providerName: 'Sunshine Support' },
+          { text: 'Premium upgrade: PhysioPlus Disability', time: '4 hours ago', type: 'success', providerName: 'PhysioPlus Disability' },
+          { text: 'New review submitted for MindBridge', time: '6 hours ago', type: 'info', providerName: 'MindBridge' },
           { text: 'New participant: Sarah Mitchell', time: '8 hours ago', type: 'info' },
-          { text: 'Booking confirmed: Little Stars', time: '12 hours ago', type: 'success' },
+          { text: 'Booking confirmed: Little Stars', time: '12 hours ago', type: 'success', providerName: 'Little Stars' },
           { text: 'Support ticket: Plan management query', time: '1 day ago', type: 'warning' },
-        ].map((a, i) => React.createElement('div', { key: i, style: { display: 'flex', gap: '10px', padding: '8px 0', borderBottom: i < 5 ? `1px solid ${c.border}` : 'none' } },
-          React.createElement('div', { style: { width: 8, height: 8, borderRadius: '50%', marginTop: '6px', flexShrink: 0, background: a.type === 'success' ? COLORS.success : a.type === 'warning' ? COLORS.warning : COLORS.info } }),
-          React.createElement('div', { style: { flex: 1 } },
-            React.createElement('p', { style: { fontSize: FONT_SIZES.sm, color: c.text } }, a.text),
-            React.createElement('p', { style: { fontSize: FONT_SIZES.xs, color: c.textMuted } }, a.time),
-          ),
-        )),
+        ].map((a, i) => {
+          const matchedProvider = a.providerName ? state.providers.find(p => p.name.toLowerCase().includes(a.providerName.toLowerCase())) : null;
+          return React.createElement('div', {
+            key: i,
+            onClick: matchedProvider ? () => dispatch({type:ACTION_TYPES.NAV_GOTO,payload:{route:'provider-profile',params:{providerId:matchedProvider.id}}}) : undefined,
+            style: { display: 'flex', gap: '10px', padding: '8px 4px', borderBottom: i < 5 ? `1px solid ${c.border}` : 'none', cursor: matchedProvider ? 'pointer' : 'default', borderRadius: RADIUS.sm, transition: 'background 0.2s' },
+            onMouseEnter: matchedProvider ? (ev) => ev.currentTarget.style.background = c.surfaceHover : undefined,
+            onMouseLeave: matchedProvider ? (ev) => ev.currentTarget.style.background = 'transparent' : undefined,
+          },
+            React.createElement('div', { style: { width: 8, height: 8, borderRadius: '50%', marginTop: '6px', flexShrink: 0, background: a.type === 'success' ? COLORS.success : a.type === 'warning' ? COLORS.warning : COLORS.info } }),
+            React.createElement('div', { style: { flex: 1 } },
+              React.createElement('p', { style: { fontSize: FONT_SIZES.sm, color: c.text } }, a.text),
+              React.createElement('p', { style: { fontSize: FONT_SIZES.xs, color: c.textMuted } }, a.time),
+            ),
+          );
+        }),
       ),
     ),
   );
@@ -3656,7 +3751,7 @@ function AdminDashboard() {
         React.createElement('table', { style: { width: '100%', borderCollapse: 'collapse' } },
           React.createElement('thead', null,
             React.createElement('tr', null,
-              ['Name','Email','Role','Status'].map(h => React.createElement('th', { key: h, style: { textAlign: 'left', padding: '10px 12px', fontSize: FONT_SIZES.xs, fontWeight: 700, color: c.textMuted, textTransform: 'uppercase', borderBottom: `1px solid ${c.border}` } }, h)),
+              ['Name','Email','Role','Status','Actions'].map(h => React.createElement('th', { key: h, style: { textAlign: 'left', padding: '10px 12px', fontSize: FONT_SIZES.xs, fontWeight: 700, color: c.textMuted, textTransform: 'uppercase', borderBottom: `1px solid ${c.border}` } }, h)),
             ),
           ),
           React.createElement('tbody', null,
@@ -3675,6 +3770,19 @@ function AdminDashboard() {
               React.createElement('td', { style: { padding: '10px 12px', borderBottom: `1px solid ${c.border}` } },
                 React.createElement(Badge, { variant: 'success', size: 'xs' }, 'Active'),
               ),
+              React.createElement('td', { style: { padding: '10px 12px', borderBottom: `1px solid ${c.border}` } },
+                React.createElement('div', { style: { display: 'flex', gap: '6px' } },
+                  u.role === 'provider' && React.createElement(Button, {
+                    variant: 'ghost', size: 'sm',
+                    onClick: () => dispatch({type:ACTION_TYPES.NAV_GOTO,payload:{route:'provider-profile',params:{providerId:u.id}}}),
+                  }, 'View'),
+                  React.createElement(Button, {
+                    variant: 'ghost', size: 'sm',
+                    onClick: () => dispatch({type:ACTION_TYPES.SUSPEND_USER,payload:u.id}),
+                    style: { color: COLORS.warning },
+                  }, 'Suspend'),
+                ),
+              ),
             )),
           ),
         ),
@@ -3691,7 +3799,11 @@ function AdminDashboard() {
       React.createElement(StatCard, { label: 'Starter', value: freeCount, icon: Icons.user(20, c.textMuted) }),
     ),
     React.createElement('div', { style: { display: 'grid', gap: '12px' } },
-      state.providers.map(p => React.createElement(Card, { key: p.id },
+      state.providers.map(p => React.createElement(Card, {
+        key: p.id,
+        onClick: () => dispatch({type:ACTION_TYPES.NAV_GOTO,payload:{route:'provider-profile',params:{providerId:p.id}}}),
+        style: { cursor: 'pointer' },
+      },
         React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
           React.createElement('div', { style: { display: 'flex', gap: '12px', alignItems: 'center' } },
             React.createElement(Avatar, { name: p.name, size: 36 }),
@@ -3739,29 +3851,146 @@ function AdminDashboard() {
     React.createElement('h2', { style: { fontSize: FONT_SIZES['2xl'], fontWeight: 800, color: c.text, marginBottom: '24px' } }, 'Activity Feed'),
     React.createElement(Card, null,
       [
-        { text: 'Sarah Mitchell sent an enquiry to Sunshine Support', time: '30 minutes ago', type: 'info' },
-        { text: 'PhysioPlus Disability upgraded to Premium plan', time: '1 hour ago', type: 'success' },
-        { text: 'New review: 5 stars for MindBridge Psychology', time: '2 hours ago', type: 'success' },
-        { text: 'James Chen booked hydrotherapy at PhysioPlus', time: '3 hours ago', type: 'info' },
+        { text: 'Sarah Mitchell sent an enquiry to Sunshine Support', time: '30 minutes ago', type: 'info', providerName: 'Sunshine Support' },
+        { text: 'PhysioPlus Disability upgraded to Premium plan', time: '1 hour ago', type: 'success', providerName: 'PhysioPlus' },
+        { text: 'New review: 5 stars for MindBridge Psychology', time: '2 hours ago', type: 'success', providerName: 'MindBridge' },
+        { text: 'James Chen booked hydrotherapy at PhysioPlus', time: '3 hours ago', type: 'info', providerName: 'PhysioPlus' },
         { text: 'New provider registered: Garden Therapy Co', time: '5 hours ago', type: 'info' },
-        { text: 'CareFirst Plan Management responded to review', time: '6 hours ago', type: 'info' },
-        { text: 'Booking cancelled: Happy Days Community', time: '8 hours ago', type: 'warning' },
+        { text: 'CareFirst Plan Management responded to review', time: '6 hours ago', type: 'info', providerName: 'CareFirst' },
+        { text: 'Booking cancelled: Happy Days Community', time: '8 hours ago', type: 'warning', providerName: 'Happy Days' },
         { text: 'New participant: Emma Johnson from Merewether', time: '10 hours ago', type: 'info' },
-        { text: 'Little Stars Early Intervention hit 50 reviews', time: '12 hours ago', type: 'success' },
-        { text: 'Harmony SIL Homes updated their profile', time: '1 day ago', type: 'info' },
-        { text: 'TechAssist AT Solutions added new photos', time: '1 day ago', type: 'info' },
+        { text: 'Little Stars Early Intervention hit 50 reviews', time: '12 hours ago', type: 'success', providerName: 'Little Stars' },
+        { text: 'Harmony SIL Homes updated their profile', time: '1 day ago', type: 'info', providerName: 'Harmony' },
+        { text: 'TechAssist AT Solutions added new photos', time: '1 day ago', type: 'info', providerName: 'TechAssist' },
         { text: 'Monthly billing processed: $2,847 collected', time: '2 days ago', type: 'success' },
-      ].map((a, i) => React.createElement('div', { key: i, style: { display: 'flex', gap: '12px', padding: '12px 0', borderBottom: `1px solid ${c.border}` } },
-        React.createElement('div', { style: { width: 10, height: 10, borderRadius: '50%', marginTop: '5px', flexShrink: 0, background: a.type === 'success' ? COLORS.success : a.type === 'warning' ? COLORS.warning : COLORS.info } }),
-        React.createElement('div', { style: { flex: 1 } },
-          React.createElement('p', { style: { fontSize: FONT_SIZES.sm, color: c.text } }, a.text),
-          React.createElement('p', { style: { fontSize: FONT_SIZES.xs, color: c.textMuted, marginTop: '2px' } }, a.time),
-        ),
-      )),
+      ].map((a, i) => {
+        const matchedProvider = a.providerName ? state.providers.find(p => p.name.toLowerCase().includes(a.providerName.toLowerCase())) : null;
+        return React.createElement('div', {
+          key: i,
+          onClick: matchedProvider ? () => dispatch({type:ACTION_TYPES.NAV_GOTO,payload:{route:'provider-profile',params:{providerId:matchedProvider.id}}}) : undefined,
+          style: { display: 'flex', gap: '12px', padding: '12px 4px', borderBottom: `1px solid ${c.border}`, cursor: matchedProvider ? 'pointer' : 'default', borderRadius: RADIUS.sm, transition: 'background 0.2s' },
+          onMouseEnter: matchedProvider ? (ev) => ev.currentTarget.style.background = c.surfaceHover : undefined,
+          onMouseLeave: matchedProvider ? (ev) => ev.currentTarget.style.background = 'transparent' : undefined,
+        },
+          React.createElement('div', { style: { width: 10, height: 10, borderRadius: '50%', marginTop: '5px', flexShrink: 0, background: a.type === 'success' ? COLORS.success : a.type === 'warning' ? COLORS.warning : COLORS.info } }),
+          React.createElement('div', { style: { flex: 1 } },
+            React.createElement('p', { style: { fontSize: FONT_SIZES.sm, color: c.text } }, a.text),
+            React.createElement('p', { style: { fontSize: FONT_SIZES.xs, color: c.textMuted, marginTop: '2px' } }, a.time),
+          ),
+        );
+      }),
     ),
   );
 
   return null;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   Static Info Pages
+   ═══════════════════════════════════════════════════════════════ */
+
+const INFO_PAGES = {
+  help: {
+    title: 'Help Centre',
+    sections: [
+      { heading: 'Getting Started', content: 'NexaConnect makes it easy to find and connect with NDIS providers in your area. Simply browse our directory, filter by service type and location, and send an enquiry directly to providers you\'re interested in.' },
+      { heading: 'How do I find a provider?', content: 'Use the Browse Directory feature to search by service category, suburb, rating, and more. You can also filter by plan type (self-managed, plan-managed, or NDIA-managed) to find providers that accept your funding type.' },
+      { heading: 'How do I send an enquiry?', content: 'Visit any provider\'s profile page and click the "Enquire" button. You\'ll need to be logged in as a participant. Your message will be sent directly to the provider and you can track responses in your dashboard.' },
+      { heading: 'How do bookings work?', content: 'Premium providers offer direct booking through NexaConnect. Visit their profile, click "Book", and select your preferred date and time. The provider will confirm or suggest an alternative.' },
+      { heading: 'How do I leave a review?', content: 'After interacting with a provider, visit their profile and go to the Reviews tab. Click "Write Review" to share your experience and help other participants make informed decisions.' },
+      { heading: 'Account & Settings', content: 'Manage your profile, notification preferences, and account settings from your dashboard. Providers can edit their profile, manage subscriptions, and track analytics from their provider dashboard.' },
+    ],
+  },
+  contact: {
+    title: 'Contact Us',
+    sections: [
+      { heading: 'Get in Touch', content: 'We\'d love to hear from you. Whether you have a question about the platform, need help with your account, or want to provide feedback, our team is here to help.' },
+      { heading: 'Email', content: 'support@nexaconnect.com.au — We aim to respond within 24 hours on business days.' },
+      { heading: 'Phone', content: '1800 NEXA CONNECT (1800 639 226) — Available Monday to Friday, 9am – 5pm AEST.' },
+      { heading: 'Office', content: 'NexaConnect Pty Ltd\nLevel 2, 45 Hunter Street\nNewcastle NSW 2300\nAustralia' },
+      { heading: 'For Providers', content: 'Interested in listing your services on NexaConnect? Register as a provider to get started with our free Starter plan, or contact our partnerships team at partners@nexaconnect.com.au for more information about Premium features.' },
+      { heading: 'Report an Issue', content: 'If you\'ve encountered a technical issue or need to report inappropriate content, please email us at support@nexaconnect.com.au with details and we\'ll investigate promptly.' },
+    ],
+  },
+  'ndis-resources': {
+    title: 'NDIS Resources',
+    sections: [
+      { heading: 'Understanding the NDIS', content: 'The National Disability Insurance Scheme (NDIS) provides funding to eligible Australians with a permanent and significant disability. It helps participants access the reasonable and necessary supports they need to live an ordinary life.' },
+      { heading: 'NDIS Official Website', content: 'Visit the official NDIS website at ndis.gov.au for comprehensive information about eligibility, planning, and accessing supports.' },
+      { heading: 'Plan Management Options', content: 'NDIS participants can choose how their funding is managed:\n\n• Self-Managed — You manage your own funding and pay providers directly.\n• Plan-Managed — A plan manager handles payments and financial reporting on your behalf.\n• NDIA-Managed — The NDIA pays providers directly from your plan.' },
+      { heading: 'Finding the Right Provider', content: 'When choosing a provider, consider their experience with your specific needs, location, availability, and reviews from other participants. NexaConnect makes this process easier with verified reviews, detailed profiles, and direct enquiry features.' },
+      { heading: 'Useful Links', content: '• NDIS — ndis.gov.au\n• NDIS Quality & Safeguards Commission — ndiscommission.gov.au\n• Disability Gateway — disabilitygateway.gov.au\n• NDIS Plan Management — ndis.gov.au/participants/using-your-plan/managing-your-plan' },
+      { heading: 'Need Help with Your Plan?', content: 'If you need assistance understanding your NDIS plan or finding appropriate providers, Local Area Coordinators (LACs) can help. Contact the NDIS on 1800 800 110 for more information.' },
+    ],
+  },
+  about: {
+    title: 'About NexaConnect',
+    sections: [
+      { heading: 'Our Mission', content: 'NexaConnect is Australia\'s dedicated NDIS provider marketplace, built to bridge the gap between participants seeking quality disability services and providers ready to deliver them. We believe everyone deserves easy access to the support they need.' },
+      { heading: 'Why NexaConnect?', content: 'Navigating the NDIS provider landscape can be overwhelming. NexaConnect simplifies this by offering a curated, searchable directory of verified providers with real reviews, direct enquiry capabilities, and transparent service information — all in one place.' },
+      { heading: 'How It Works', content: 'Participants can search for providers by service type, location, and availability. Send enquiries directly, read genuine reviews from other participants, and book appointments with Premium providers — all through our secure platform.' },
+      { heading: 'For Providers', content: 'NexaConnect helps disability service providers grow their business by increasing visibility to NDIS participants actively seeking services. Our tiered subscription model offers analytics, priority listings, and direct booking features to help you stand out.' },
+      { heading: 'Our Story', content: 'Founded in Newcastle, Australia, NexaConnect was born from the firsthand experience of navigating the NDIS system. We saw the need for a modern, user-friendly platform that puts participants and providers in direct contact, and we built it.' },
+      { heading: 'Our Values', content: '• Accessibility — Technology should make life easier for people with disability, not harder.\n• Transparency — Real reviews, verified providers, and clear pricing.\n• Community — We\'re building a connected community of participants and providers.\n• Quality — We hold our platform and listed providers to the highest standards.' },
+    ],
+  },
+  privacy: {
+    title: 'Privacy Policy',
+    sections: [
+      { heading: 'Introduction', content: 'NexaConnect Pty Ltd ("we", "our", "us") is committed to protecting the privacy of your personal information. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our platform.' },
+      { heading: 'Information We Collect', content: 'We collect information you provide directly to us, including:\n• Name, email address, and contact details when you create an account\n• Profile information for providers (business name, services, location)\n• Messages sent through our enquiry system\n• Reviews and ratings you submit\n• Payment information for subscription services (processed securely via Stripe)' },
+      { heading: 'How We Use Your Information', content: 'We use collected information to:\n• Provide, maintain, and improve our platform\n• Connect participants with relevant providers\n• Process transactions and send related information\n• Send you updates, security alerts, and support messages\n• Monitor and analyse usage trends to improve user experience' },
+      { heading: 'Information Sharing', content: 'We do not sell your personal information. We may share information with:\n• Service providers who assist in operating our platform\n• Provider profiles visible to participants searching the directory\n• Law enforcement when required by law or to protect rights and safety' },
+      { heading: 'Data Security', content: 'We implement appropriate technical and organisational measures to protect your personal information against unauthorised access, alteration, disclosure, or destruction. All data is encrypted in transit and at rest.' },
+      { heading: 'Your Rights', content: 'Under the Australian Privacy Act 1988, you have the right to:\n• Access your personal information\n• Request correction of inaccurate information\n• Request deletion of your account and data\n• Opt out of marketing communications\n\nContact us at privacy@nexaconnect.com.au to exercise these rights.' },
+      { heading: 'Contact', content: 'For privacy-related enquiries, contact our Privacy Officer at privacy@nexaconnect.com.au or write to: Privacy Officer, NexaConnect Pty Ltd, Level 2, 45 Hunter Street, Newcastle NSW 2300.' },
+    ],
+  },
+  terms: {
+    title: 'Terms of Service',
+    sections: [
+      { heading: 'Acceptance of Terms', content: 'By accessing or using NexaConnect ("the Platform"), you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use the Platform.' },
+      { heading: 'Account Registration', content: 'To access certain features, you must create an account. You are responsible for maintaining the confidentiality of your account credentials and for all activities under your account. You must provide accurate and complete information during registration.' },
+      { heading: 'Provider Listings', content: 'Providers are responsible for the accuracy of their profile information, including services offered, qualifications, availability, and pricing. NexaConnect does not guarantee the quality of services provided by listed providers. We encourage participants to conduct their own due diligence.' },
+      { heading: 'Reviews & Content', content: 'Users may submit reviews and content. By submitting content, you grant NexaConnect a non-exclusive licence to use, display, and distribute that content on the platform. Reviews must be honest, relevant, and based on genuine experiences. We reserve the right to remove content that violates our guidelines.' },
+      { heading: 'Subscriptions & Payments', content: 'Provider subscriptions are billed monthly or annually as selected. You may cancel your subscription at any time; cancellation takes effect at the end of the current billing period. Refunds are handled on a case-by-case basis.' },
+      { heading: 'Limitation of Liability', content: 'NexaConnect is a marketplace platform that connects participants with providers. We are not a party to any agreement between participants and providers. We do not guarantee the availability, quality, or suitability of any provider\'s services. To the maximum extent permitted by law, NexaConnect shall not be liable for any indirect, incidental, or consequential damages.' },
+      { heading: 'Changes to Terms', content: 'We may update these Terms of Service from time to time. We will notify users of significant changes via email or platform notification. Continued use of the Platform after changes constitutes acceptance of the updated terms.' },
+      { heading: 'Governing Law', content: 'These Terms are governed by the laws of New South Wales, Australia. Any disputes shall be subject to the exclusive jurisdiction of the courts of New South Wales.' },
+    ],
+  },
+};
+
+function InfoPage({ pageKey }) {
+  const { theme } = useTheme();
+  const { dispatch } = useApp();
+  const responsive = useResponsive();
+  const c = COLORS[theme];
+  const page = INFO_PAGES[pageKey];
+
+  return React.createElement(Fragment, null,
+    React.createElement('div', {
+      style: { padding: responsive.isMobile ? '80px 20px 60px' : '100px 40px 80px', maxWidth: '800px', margin: '0 auto' },
+    },
+      React.createElement('button', {
+        onClick: () => dispatch({type:ACTION_TYPES.NAV_BACK}),
+        style: { display:'flex',alignItems:'center',gap:'6px',background:'none',border:'none',cursor:'pointer',color:c.textSecondary,fontFamily:FONTS.sans,fontSize:FONT_SIZES.sm,fontWeight:600,marginBottom:'24px' },
+      }, Icons.arrowLeft(16), 'Back'),
+      React.createElement('h1', {
+        style: { fontSize: responsive.isMobile ? FONT_SIZES['2xl'] : FONT_SIZES['3xl'], fontWeight: 800, color: c.text, marginBottom: '32px' },
+      }, page.title),
+      ...page.sections.map((section, i) => React.createElement('div', { key: i, style: { marginBottom: '28px' } },
+        React.createElement('h2', {
+          style: { fontSize: FONT_SIZES.lg, fontWeight: 700, color: c.text, marginBottom: '10px' },
+        }, section.heading),
+        React.createElement('p', {
+          style: { color: c.textSecondary, fontSize: FONT_SIZES.base, lineHeight: 1.7, whiteSpace: 'pre-line' },
+        }, section.content),
+      )),
+    ),
+    React.createElement(Footer),
+  );
 }
 
 
@@ -3783,6 +4012,12 @@ function AppRouter() {
     case 'provider-dashboard': return React.createElement(ProviderDashboard);
     case 'participant-dashboard': return React.createElement(ParticipantDashboard);
     case 'admin-dashboard': return React.createElement(AdminDashboard);
+    case 'help': return React.createElement(InfoPage, { pageKey: 'help' });
+    case 'contact': return React.createElement(InfoPage, { pageKey: 'contact' });
+    case 'ndis-resources': return React.createElement(InfoPage, { pageKey: 'ndis-resources' });
+    case 'about': return React.createElement(InfoPage, { pageKey: 'about' });
+    case 'privacy': return React.createElement(InfoPage, { pageKey: 'privacy' });
+    case 'terms': return React.createElement(InfoPage, { pageKey: 'terms' });
     default: return React.createElement(LandingPage);
   }
 }
