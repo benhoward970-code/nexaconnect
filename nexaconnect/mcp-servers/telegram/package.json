@@ -1,0 +1,10 @@
+{
+  "name": "telegram-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for Telegram Bot API",
+  "main": "index.js",
+  "type": "module",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1"
+  }
+}

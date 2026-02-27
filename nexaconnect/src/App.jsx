@@ -15,36 +15,36 @@ import { isStripeConfigured, redirectToCheckout, openBillingPortal } from './str
 // ── Color Palette ──
 const COLORS = {
   dark: {
-    bg: '#0A0A0F',
-    surface: '#141420',
-    surfaceHover: '#1C1C2E',
-    surfaceAlt: '#1A1A2E',
-    border: 'rgba(59,130,246,0.15)',
+    bg: '#0B0F1A',
+    surface: '#111827',
+    surfaceHover: '#1F2937',
+    surfaceAlt: '#151C2C',
+    border: 'rgba(255,255,255,0.08)',
     borderHover: 'rgba(59,130,246,0.3)',
     text: '#F8FAFC',
     textSecondary: '#94A3B8',
     textMuted: '#64748B',
-    glass: 'rgba(20,20,32,0.8)',
-    glassBorder: 'rgba(59,130,246,0.12)',
+    glass: 'rgba(17,24,39,0.8)',
+    glassBorder: 'rgba(255,255,255,0.06)',
     overlay: 'rgba(0,0,0,0.6)',
     cardShadow: '0 8px 32px rgba(0,0,0,0.4)',
-    navBg: 'rgba(10,10,15,0.85)',
+    navBg: 'rgba(11,15,26,0.9)',
   },
   light: {
-    bg: '#FAFAFA',
+    bg: '#FFFFFF',
     surface: '#FFFFFF',
     surfaceHover: '#F1F5F9',
-    surfaceAlt: '#F8FAFC',
-    border: 'rgba(59,130,246,0.12)',
+    surfaceAlt: '#F9FAFB',
+    border: 'rgba(0,0,0,0.06)',
     borderHover: 'rgba(59,130,246,0.25)',
-    text: '#0F172A',
+    text: '#111827',
     textSecondary: '#475569',
     textMuted: '#94A3B8',
-    glass: 'rgba(255,255,255,0.8)',
-    glassBorder: 'rgba(59,130,246,0.1)',
+    glass: 'rgba(255,255,255,0.9)',
+    glassBorder: 'rgba(0,0,0,0.04)',
     overlay: 'rgba(0,0,0,0.4)',
-    cardShadow: '0 4px 24px rgba(0,0,0,0.08)',
-    navBg: 'rgba(255,255,255,0.85)',
+    cardShadow: '0 1px 3px rgba(0,0,0,0.04), 0 4px 24px rgba(0,0,0,0.06)',
+    navBg: 'rgba(255,255,255,0.92)',
   },
   primary: {
     50: '#EFF6FF', 100: '#DBEAFE', 200: '#BFDBFE', 300: '#93C5FD',
@@ -61,16 +61,17 @@ const COLORS = {
   error: '#EF4444',
   info: '#3B82F6',
   star: '#FBBF24',
-  gradientPrimary: 'linear-gradient(135deg, #3B82F6, #1D4ED8)',
+  gradientPrimary: 'linear-gradient(135deg, #2563EB, #1D4ED8)',
   gradientAccent: 'linear-gradient(135deg, #F97316, #EA580C)',
-  gradientHero: 'linear-gradient(135deg, #3B82F6 0%, #1D4ED8 40%, #F97316 100%)',
+  gradientHero: 'linear-gradient(160deg, #F9FAFB 0%, #EFF6FF 40%, #DBEAFE 100%)',
   gradientText: 'linear-gradient(135deg, #3B82F6, #F97316)',
-  gradientCard: 'linear-gradient(135deg, rgba(59,130,246,0.1), rgba(249,115,22,0.1))',
+  gradientCard: 'linear-gradient(135deg, rgba(249,115,22,0.06), rgba(249,115,22,0.02))',
 };
 
 // ── Typography ──
 const FONTS = {
-  sans: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif",
+  sans: "'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif",
+  display: "'Fraunces', Georgia, serif",
   mono: "'JetBrains Mono', 'Fira Code', monospace",
 };
 
@@ -272,12 +273,12 @@ function Button({ children, onClick, variant = 'primary', size = 'md', disabled,
     letterSpacing: '-0.01em',
   };
   const variants = {
-    primary: { background: COLORS.gradientPrimary, color: '#fff', boxShadow: '0 4px 15px rgba(59,130,246,0.3)' },
+    primary: { background: COLORS.primary[600], color: '#fff', boxShadow: '0 4px 15px rgba(59,130,246,0.3)' },
     secondary: { background: c.surface, color: c.text, border: `1px solid ${c.border}` },
     ghost: { background: 'transparent', color: c.textSecondary },
     accent: { background: COLORS.gradientAccent, color: '#fff', boxShadow: '0 4px 15px rgba(249,115,22,0.3)' },
     danger: { background: COLORS.error, color: '#fff' },
-    outline: { background: 'transparent', color: COLORS.primary[500], border: `2px solid ${COLORS.primary[500]}` },
+    outline: { background: 'transparent', color: COLORS.primary[500], border: `1.5px solid ${c.border}` },
   };
   return React.createElement('button', {
     onClick: disabled ? undefined : onClick,
@@ -1768,7 +1769,7 @@ function Navbar() {
   return React.createElement('nav', {
     style: {
       position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100, padding: '0 28px',
-      height: '120px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      height: '72px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       background: isMarketing ? c.navBg : c.surface,
       backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
       borderBottom: `1px solid ${c.border}`,
@@ -1785,9 +1786,11 @@ function Navbar() {
         onClick: () => dispatch({type:ACTION_TYPES.NAV_GOTO,payload:{route:'landing'}}),
         style: { cursor: 'pointer', display: 'flex', alignItems: 'center' },
       },
-        React.createElement('img', { src: theme === 'dark' ? '/logo-dark.png' : '/logo.png', alt: 'NexaConnect', style: {
-          height: 100, width: 'auto', objectFit: 'contain',
-        } }),
+        React.createElement('div', { style: { width: 36, height: 36, borderRadius: RADIUS.md, background: COLORS.primary[600], position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+          React.createElement('div', { style: { width: 14, height: 14, borderRadius: '50%', border: '2px solid #fff', position: 'absolute', left: 6, top: 8 } }),
+          React.createElement('div', { style: { width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.6)', position: 'absolute', right: 6, bottom: 8 } }),
+        ),
+        React.createElement('span', { style: { fontFamily: FONTS.display, fontWeight: 500, fontSize: FONT_SIZES.lg, color: c.text, marginLeft: '10px' } }, 'NexaConnect'),
       ),
     ),
 
@@ -1797,7 +1800,7 @@ function Navbar() {
         key: item,
         onClick: () => dispatch({type:ACTION_TYPES.NAV_GOTO,payload:{route: item.toLowerCase()}}),
         style: { background: 'none', border: 'none', color: c.textSecondary, cursor: 'pointer',
-          fontSize: FONT_SIZES.lg, fontWeight: 600, fontFamily: FONTS.sans, transition: 'color 0.2s' },
+          fontSize: FONT_SIZES.base, fontWeight: 500, fontFamily: FONTS.sans, transition: 'color 0.2s' },
         onMouseEnter: (e) => e.target.style.color = COLORS.primary[500],
         onMouseLeave: (e) => e.target.style.color = c.textSecondary,
       }, item)),
@@ -1930,8 +1933,8 @@ function Sidebar() {
 
   const sidebarContent = React.createElement('div', {
     style: {
-      width: isOpen ? '240px' : '0px', height: 'calc(100vh - 120px)', position: 'fixed',
-      top: '120px', left: 0, background: c.surface, borderRight: `1px solid ${c.border}`,
+      width: isOpen ? '240px' : '0px', height: 'calc(100vh - 72px)', position: 'fixed',
+      top: '72px', left: 0, background: c.surface, borderRight: `1px solid ${c.border}`,
       transition: 'width 0.3s ease', overflow: 'hidden', zIndex: 50,
       display: 'flex', flexDirection: 'column',
     },
@@ -2019,8 +2022,11 @@ function Footer() {
         // Brand
         React.createElement('div', null,
           React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' } },
-            React.createElement('img', { src: theme === 'dark' ? '/logo-dark.png' : '/logo.png', alt: 'NexaConnect', style: { width:28,height:28,borderRadius:RADIUS.sm,objectFit:'contain' } }),
-            React.createElement('span', { style: { fontWeight: 800, fontSize: FONT_SIZES.md, color: c.text } }, 'NexaConnect'),
+            React.createElement('div', { style: { width: 28, height: 28, borderRadius: RADIUS.sm, background: COLORS.primary[600], position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+              React.createElement('div', { style: { width: 10, height: 10, borderRadius: '50%', border: '2px solid #fff', position: 'absolute', left: 4, top: 6 } }),
+              React.createElement('div', { style: { width: 10, height: 10, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.6)', position: 'absolute', right: 4, bottom: 6 } }),
+            ),
+            React.createElement('span', { style: { fontFamily: FONTS.display, fontWeight: 500, fontSize: FONT_SIZES.md, color: c.text } }, 'NexaConnect'),
           ),
           React.createElement('p', { style: { color: c.textSecondary, fontSize: FONT_SIZES.sm, lineHeight: 1.6 } },
             'Connecting NDIS participants with quality providers across Australia.'),
@@ -2064,8 +2070,8 @@ function PageShell({ children }) {
     showSidebar && React.createElement(Sidebar),
     React.createElement('main', {
       style: {
-        marginTop: '120px', marginLeft: sidebarWidth,
-        transition: 'margin-left 0.3s', minHeight: 'calc(100vh - 120px)',
+        marginTop: '72px', marginLeft: sidebarWidth,
+        transition: 'margin-left 0.3s', minHeight: 'calc(100vh - 72px)',
         animation: 'nc-fadeIn 0.4s ease',
       },
     }, children),
@@ -2111,9 +2117,9 @@ function LandingPage() {
     // Hero Section
     React.createElement('section', {
       style: {
-        position: 'relative', overflow: 'hidden', minHeight: responsive.isMobile ? '85vh' : '90vh',
+        position: 'relative', overflow: 'hidden', minHeight: responsive.isMobile ? '80vh' : '85vh',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: responsive.isMobile ? '140px 20px 40px' : '140px 40px',
+        padding: responsive.isMobile ? '100px 20px 40px' : '100px 40px',
       },
     },
       // Background gradient
@@ -2121,25 +2127,29 @@ function LandingPage() {
         position: 'absolute', inset: 0,
         background: theme === 'dark'
           ? 'radial-gradient(ellipse at 30% 20%, rgba(59,130,246,0.15) 0%, transparent 50%), radial-gradient(ellipse at 70% 80%, rgba(249,115,22,0.1) 0%, transparent 50%)'
-          : 'radial-gradient(ellipse at 30% 20%, rgba(59,130,246,0.08) 0%, transparent 50%), radial-gradient(ellipse at 70% 80%, rgba(249,115,22,0.06) 0%, transparent 50%)',
+          : COLORS.gradientHero,
       } }),
       React.createElement('div', { style: { position: 'relative', maxWidth: '1200px', width: '100%', textAlign: 'center', zIndex: 1 } },
         React.createElement('div', { style: { animation: 'nc-fadeInUp 0.8s ease' } },
-          React.createElement(Badge, { variant: 'default', style: { marginBottom: '20px' } }, 'Australia\'s NDIS Provider Marketplace'),
+          // Editorial badge pill
+          React.createElement('div', { style: { display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 16px', borderRadius: '100px', background: theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', marginBottom: '24px', fontSize: FONT_SIZES.sm, color: c.textSecondary, fontWeight: 500 } },
+            React.createElement('span', { style: { width: 8, height: 8, borderRadius: '50%', background: '#F97316', display: 'inline-block', animation: 'nc-pulse 2s ease-in-out infinite' } }),
+            'Australia\'s NDIS Provider Marketplace',
+          ),
           React.createElement('h1', {
             style: {
-              fontSize: responsive.isMobile ? FONT_SIZES['3xl'] : FONT_SIZES['6xl'],
-              fontWeight: 900, lineHeight: 1.1, letterSpacing: '-0.03em', marginBottom: '24px',
+              fontSize: responsive.isMobile ? FONT_SIZES['3xl'] : FONT_SIZES['5xl'],
+              fontFamily: FONTS.display, fontWeight: 400, lineHeight: 1.15, letterSpacing: '-0.03em', marginBottom: '24px',
               color: c.text,
             },
           },
             'Find Your Perfect', React.createElement('br'),
-            React.createElement('span', { style: gradientText() }, 'NDIS Provider'),
+            React.createElement('em', { style: { color: COLORS.primary[600], fontStyle: 'italic' } }, 'NDIS Provider'),
           ),
           React.createElement('p', {
             style: {
-              fontSize: responsive.isMobile ? FONT_SIZES.md : FONT_SIZES.xl, color: c.textSecondary,
-              maxWidth: '640px', margin: '0 auto 32px', lineHeight: 1.6,
+              fontSize: responsive.isMobile ? FONT_SIZES.base : FONT_SIZES.lg, color: c.textSecondary,
+              maxWidth: '580px', margin: '0 auto 32px', lineHeight: 1.7,
             },
           }, 'Browse trusted providers, read real reviews, and connect for free. The smarter way to find disability support services.'),
           React.createElement('div', { style: { display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' } },
@@ -2181,11 +2191,11 @@ function LandingPage() {
     // Features Grid
     React.createElement('section', { style: { padding: responsive.isMobile ? '60px 20px' : '130px 40px' } },
       React.createElement('div', { style: { maxWidth: '1200px', margin: '0 auto' } },
-        React.createElement('div', { style: { textAlign: 'center', marginBottom: '48px' } },
-          React.createElement(Badge, { variant: 'default', style: { marginBottom: '12px' } }, 'Features'),
-          React.createElement('h2', { style: { fontSize: responsive.isMobile ? FONT_SIZES['2xl'] : FONT_SIZES['3xl'], fontWeight: 800, color: c.text, marginBottom: '12px' } },
+        React.createElement('div', { style: { textAlign: 'left', marginBottom: '48px', maxWidth: '500px' } },
+          React.createElement('p', { style: { fontSize: FONT_SIZES.xs, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: COLORS.accent[500], marginBottom: '12px' } }, 'Platform'),
+          React.createElement('h2', { style: { fontSize: responsive.isMobile ? FONT_SIZES['2xl'] : FONT_SIZES['3xl'], fontFamily: FONTS.display, fontWeight: 400, color: c.text, marginBottom: '12px' } },
             'Everything You Need'),
-          React.createElement('p', { style: { color: c.textSecondary, fontSize: FONT_SIZES.md, maxWidth: '500px', margin: '0 auto' } },
+          React.createElement('p', { style: { color: c.textSecondary, fontSize: FONT_SIZES.md } },
             'A comprehensive platform designed for NDIS participants and providers.'),
         ),
         React.createElement('div', {
@@ -2197,10 +2207,10 @@ function LandingPage() {
             style: { animation: `nc-fadeInUp ${0.3 + i * 0.1}s ease forwards`, opacity: 0, cursor: 'pointer' },
           },
             React.createElement('div', {
-              style: { width: 48, height: 48, borderRadius: RADIUS.md, background: COLORS.gradientCard,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px', color: COLORS.primary[500] },
-            }, f.icon(24, COLORS.primary[500])),
-            React.createElement('h3', { style: { fontSize: FONT_SIZES.lg, fontWeight: 700, color: c.text, marginBottom: '8px' } }, f.title),
+              style: { width: 48, height: 48, borderRadius: RADIUS.md, background: 'rgba(249,115,22,0.08)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px' },
+            }, f.icon(24, COLORS.accent[500])),
+            React.createElement('h3', { style: { fontSize: FONT_SIZES.lg, fontFamily: FONTS.display, fontWeight: 500, color: c.text, marginBottom: '8px' } }, f.title),
             React.createElement('p', { style: { color: c.textSecondary, fontSize: FONT_SIZES.sm, lineHeight: 1.6 } }, f.desc),
           )),
         ),
@@ -2208,28 +2218,30 @@ function LandingPage() {
     ),
 
     // How It Works
-    React.createElement('section', { style: { padding: responsive.isMobile ? '60px 20px' : '130px 40px', background: c.surfaceAlt } },
-      React.createElement('div', { style: { maxWidth: '1000px', margin: '0 auto' } },
+    React.createElement('section', { style: { padding: responsive.isMobile ? '60px 20px' : '130px 40px', background: COLORS.primary[900], position: 'relative', overflow: 'hidden' } },
+      // Decorative orange radial gradient
+      React.createElement('div', { style: { position: 'absolute', top: '-20%', right: '-10%', width: '500px', height: '500px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(249,115,22,0.15) 0%, transparent 70%)', pointerEvents: 'none' } }),
+      React.createElement('div', { style: { maxWidth: '1000px', margin: '0 auto', position: 'relative', zIndex: 1 } },
         React.createElement('div', { style: { textAlign: 'center', marginBottom: '48px' } },
-          React.createElement(Badge, { variant: 'info', style: { marginBottom: '12px' } }, 'How It Works'),
-          React.createElement('h2', { style: { fontSize: responsive.isMobile ? FONT_SIZES['2xl'] : FONT_SIZES['3xl'], fontWeight: 800, color: c.text } },
-            'Get Connected in 3 Steps'),
+          React.createElement('h2', { style: { fontSize: responsive.isMobile ? FONT_SIZES['2xl'] : FONT_SIZES['3xl'], fontFamily: FONTS.display, fontWeight: 400, color: '#FFFFFF' } },
+            'Get Connected in ', React.createElement('em', { style: { color: COLORS.accent[500], fontStyle: 'italic' } }, '3 Steps')),
         ),
         React.createElement('div', {
           style: { display: 'grid', gridTemplateColumns: responsive.isMobile ? '1fr' : 'repeat(3, 1fr)', gap: '32px' },
         },
           HOW_IT_WORKS.map((step, i) => React.createElement('div', {
-            key: i, style: { textAlign: 'center', animation: `nc-fadeInUp ${0.4 + i * 0.15}s ease forwards`, opacity: 0 },
+            key: i, style: { textAlign: 'center', animation: `nc-fadeInUp ${0.4 + i * 0.15}s ease forwards`, opacity: 0,
+              background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: RADIUS.lg, padding: '32px 24px', backdropFilter: 'blur(10px)' },
           },
             React.createElement('div', {
               style: {
-                width: 64, height: 64, borderRadius: '50%', background: COLORS.gradientPrimary,
+                width: 56, height: 56, borderRadius: RADIUS.md, background: 'rgba(249,115,22,0.12)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px',
-                fontSize: FONT_SIZES.xl, fontWeight: 800, color: '#fff',
+                fontSize: FONT_SIZES.lg, fontWeight: 700, color: COLORS.accent[500],
               },
             }, step.step),
-            React.createElement('h3', { style: { fontSize: FONT_SIZES.lg, fontWeight: 700, color: c.text, marginBottom: '8px' } }, step.title),
-            React.createElement('p', { style: { color: c.textSecondary, fontSize: FONT_SIZES.sm, lineHeight: 1.6 } }, step.desc),
+            React.createElement('h3', { style: { fontSize: FONT_SIZES.lg, fontFamily: FONTS.display, fontWeight: 500, color: '#FFFFFF', marginBottom: '8px' } }, step.title),
+            React.createElement('p', { style: { color: 'rgba(255,255,255,0.6)', fontSize: FONT_SIZES.sm, lineHeight: 1.6 } }, step.desc),
           )),
         ),
       ),
@@ -2238,8 +2250,9 @@ function LandingPage() {
     // Category Showcase
     React.createElement('section', { style: { padding: responsive.isMobile ? '60px 20px' : '130px 40px' } },
       React.createElement('div', { style: { maxWidth: '1200px', margin: '0 auto' } },
-        React.createElement('div', { style: { textAlign: 'center', marginBottom: '40px' } },
-          React.createElement('h2', { style: { fontSize: responsive.isMobile ? FONT_SIZES['2xl'] : FONT_SIZES['3xl'], fontWeight: 800, color: c.text, marginBottom: '12px' } },
+        React.createElement('div', { style: { textAlign: 'left', marginBottom: '40px' } },
+          React.createElement('p', { style: { fontSize: FONT_SIZES.xs, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: COLORS.accent[500], marginBottom: '12px' } }, 'Services'),
+          React.createElement('h2', { style: { fontSize: responsive.isMobile ? FONT_SIZES['2xl'] : FONT_SIZES['3xl'], fontFamily: FONTS.display, fontWeight: 400, color: c.text, marginBottom: '12px' } },
             'Browse by Category'),
           React.createElement('p', { style: { color: c.textSecondary } }, '15 NDIS service categories to explore'),
         ),
@@ -2275,8 +2288,9 @@ function LandingPage() {
     // Testimonials
     React.createElement('section', { style: { padding: responsive.isMobile ? '60px 20px' : '130px 40px' } },
       React.createElement('div', { style: { maxWidth: '1000px', margin: '0 auto' } },
-        React.createElement('div', { style: { textAlign: 'center', marginBottom: '40px' } },
-          React.createElement('h2', { style: { fontSize: responsive.isMobile ? FONT_SIZES['2xl'] : FONT_SIZES['3xl'], fontWeight: 800, color: c.text } },
+        React.createElement('div', { style: { textAlign: 'left', marginBottom: '40px' } },
+          React.createElement('p', { style: { fontSize: FONT_SIZES.xs, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: COLORS.accent[500], marginBottom: '12px' } }, 'Testimonials'),
+          React.createElement('h2', { style: { fontSize: responsive.isMobile ? FONT_SIZES['2xl'] : FONT_SIZES['3xl'], fontFamily: FONTS.display, fontWeight: 400, color: c.text } },
             'What People Are Saying'),
         ),
         React.createElement('div', {
@@ -2300,20 +2314,28 @@ function LandingPage() {
     // Final CTA
     React.createElement('section', {
       style: {
-        padding: responsive.isMobile ? '60px 20px' : '130px 40px', textAlign: 'center',
-        background: COLORS.gradientPrimary, position: 'relative',
+        padding: responsive.isMobile ? '40px 20px' : '60px 40px', textAlign: 'center',
       },
     },
-      React.createElement('div', { style: { position: 'relative', zIndex: 1 } },
-        React.createElement('h2', { style: { fontSize: responsive.isMobile ? FONT_SIZES['2xl'] : FONT_SIZES['4xl'], fontWeight: 900, color: '#fff', marginBottom: '16px' } },
-          'Start Your Journey Today'),
-        React.createElement('p', { style: { color: 'rgba(255,255,255,0.8)', fontSize: FONT_SIZES.md, marginBottom: '32px', maxWidth: '500px', margin: '0 auto 32px' } },
-          'Join thousands of NDIS participants and providers already using NexaConnect.'),
-        React.createElement(Button, {
-          variant: 'secondary', size: 'lg',
-          onClick: () => dispatch({type:ACTION_TYPES.NAV_GOTO,payload:{route:'register'}}),
-          style: { background: '#fff', color: COLORS.primary[700], border: 'none' },
-        }, 'Get Started Free'),
+      React.createElement('div', {
+        style: {
+          maxWidth: '1000px', margin: '0 auto', background: '#F97316', borderRadius: '24px',
+          padding: responsive.isMobile ? '48px 24px' : '80px 60px', position: 'relative', overflow: 'hidden',
+        },
+      },
+        // Decorative radial gradient overlay
+        React.createElement('div', { style: { position: 'absolute', inset: 0, background: 'radial-gradient(circle at 80% 20%, rgba(255,255,255,0.15) 0%, transparent 50%)', pointerEvents: 'none' } }),
+        React.createElement('div', { style: { position: 'relative', zIndex: 1 } },
+          React.createElement('h2', { style: { fontSize: responsive.isMobile ? FONT_SIZES['2xl'] : FONT_SIZES['4xl'], fontFamily: FONTS.display, fontWeight: 400, color: '#fff', marginBottom: '16px' } },
+            'Start Your Journey Today'),
+          React.createElement('p', { style: { color: 'rgba(255,255,255,0.85)', fontSize: FONT_SIZES.md, marginBottom: '32px', maxWidth: '500px', margin: '0 auto 32px' } },
+            'Join thousands of NDIS participants and providers already using NexaConnect.'),
+          React.createElement(Button, {
+            variant: 'secondary', size: 'lg',
+            onClick: () => dispatch({type:ACTION_TYPES.NAV_GOTO,payload:{route:'register'}}),
+            style: { background: '#fff', color: '#F97316', border: 'none', fontWeight: 600 },
+          }, 'Get Started Free'),
+        ),
       ),
     ),
 
@@ -2526,7 +2548,7 @@ function LoginPage() {
   return React.createElement('div', {
     style: {
       minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      padding: '140px 20px 40px',
+      padding: '96px 20px 40px',
     },
   },
     React.createElement(Card, {
@@ -2674,7 +2696,7 @@ function RegisterPage() {
   };
 
   return React.createElement('div', {
-    style: { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '140px 20px 40px' },
+    style: { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '96px 20px 40px' },
   },
     React.createElement(Card, {
       style: { width: '100%', maxWidth: '480px', padding: '40px 32px', animation: 'nc-fadeIn 0.5s ease' },
@@ -2969,7 +2991,7 @@ function DirectoryPage() {
 
   const activeFilterCount = Object.values(state.searchFilters).filter(v => v && v !== 0 && v !== false).length;
 
-  return React.createElement('div', { style: { padding: responsive.isMobile ? '140px 16px 40px' : '140px 32px 40px', maxWidth: '1400px', margin: '0 auto' } },
+  return React.createElement('div', { style: { padding: responsive.isMobile ? '96px 16px 40px' : '96px 32px 40px', maxWidth: '1400px', margin: '0 auto' } },
     // Header
     React.createElement('div', { style: { marginBottom: '24px' } },
       React.createElement('h1', { style: { fontSize: FONT_SIZES['2xl'], fontWeight: 800, color: c.text, marginBottom: '8px' } }, 'Browse Providers'),
@@ -3001,7 +3023,7 @@ function DirectoryPage() {
       showFilters && React.createElement(Card, {
         style: {
           width: responsive.isMobile ? '100%' : '260px', flexShrink: 0, padding: '20px',
-          position: responsive.isMobile ? 'static' : 'sticky', top: '140px', alignSelf: 'flex-start',
+          position: responsive.isMobile ? 'static' : 'sticky', top: '96px', alignSelf: 'flex-start',
           maxHeight: responsive.isMobile ? 'none' : 'calc(100vh - 160px)', overflowY: 'auto',
         },
       },
@@ -3143,7 +3165,7 @@ function ProviderProfilePage() {
     addToast('Review submitted!', 'success');
   };
 
-  return React.createElement('div', { style: { padding: responsive.isMobile ? '140px 16px 40px' : '140px 32px 40px', maxWidth: '1000px', margin: '0 auto' } },
+  return React.createElement('div', { style: { padding: responsive.isMobile ? '140px 16px 40px' : '96px 32px 40px', maxWidth: '1000px', margin: '0 auto' } },
     // Back button
     React.createElement(Button, { variant: 'ghost', size: 'sm', onClick: () => dispatch({type:ACTION_TYPES.NAV_BACK}), icon: Icons.arrowLeft(16), style: { marginBottom: '16px' } }, 'Back'),
 
@@ -4887,7 +4909,7 @@ function InfoPage({ pageKey }) {
 
   return React.createElement(Fragment, null,
     React.createElement('div', {
-      style: { padding: responsive.isMobile ? '140px 20px 60px' : '140px 40px 80px', maxWidth: '800px', margin: '0 auto' },
+      style: { padding: responsive.isMobile ? '96px 20px 60px' : '96px 40px 80px', maxWidth: '800px', margin: '0 auto' },
     },
       React.createElement('button', {
         onClick: () => dispatch({type:ACTION_TYPES.NAV_BACK}),
@@ -4926,7 +4948,7 @@ function NDISCodeOfConductPage() {
     { number: '7', title: 'Prevent and respond to sexual misconduct', description: 'Take all reasonable steps to prevent and respond to sexual misconduct.', examples: 'Maintain professional boundaries at all times. Never engage in sexual conduct with a participant in your care. Report any sexual misconduct by others immediately to the NDIS Commission and police.' },
   ];
   return React.createElement(Fragment, null,
-    React.createElement('div', { style: { padding: responsive.isMobile ? '140px 20px 60px' : '140px 40px 80px', maxWidth: '900px', margin: '0 auto' } },
+    React.createElement('div', { style: { padding: responsive.isMobile ? '96px 20px 60px' : '96px 40px 80px', maxWidth: '900px', margin: '0 auto' } },
       React.createElement('button', { onClick: () => dispatch({ type: ACTION_TYPES.NAV_BACK }), style: { display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', color: c.textSecondary, fontFamily: FONTS.sans, fontSize: FONT_SIZES.sm, fontWeight: 600, marginBottom: '24px' } }, Icons.arrowLeft(16), 'Back'),
       React.createElement('h1', { style: { fontSize: responsive.isMobile ? FONT_SIZES['2xl'] : FONT_SIZES['3xl'], fontWeight: 800, color: c.text, marginBottom: '12px' } }, 'NDIS Code of Conduct'),
       React.createElement('p', { style: { color: c.textSecondary, fontSize: FONT_SIZES.md, lineHeight: 1.7, marginBottom: SPACING.xl } }, 'The NDIS Code of Conduct is established under section 123A of the National Disability Insurance Scheme Act 2013 (Cth). It sets expectations for all NDIS providers and workers. All providers listed on NexaConnect are required to comply with the Code.'),
@@ -4999,7 +5021,7 @@ function ComplaintsPage() {
     { icon: Icons.mapPin, label: 'Post', detail: 'Complaints Officer, NexaConnect Pty Ltd', sub: 'Level 2, 45 Hunter Street, Newcastle NSW 2300' },
   ];
   return React.createElement(Fragment, null,
-    React.createElement('div', { style: { padding: responsive.isMobile ? '140px 20px 60px' : '140px 40px 80px', maxWidth: '900px', margin: '0 auto' } },
+    React.createElement('div', { style: { padding: responsive.isMobile ? '96px 20px 60px' : '96px 40px 80px', maxWidth: '900px', margin: '0 auto' } },
       React.createElement('button', { onClick: () => dispatch({ type: ACTION_TYPES.NAV_BACK }), style: { display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', color: c.textSecondary, fontFamily: FONTS.sans, fontSize: FONT_SIZES.sm, fontWeight: 600, marginBottom: '24px' } }, Icons.arrowLeft(16), 'Back'),
       React.createElement('h1', { style: { fontSize: responsive.isMobile ? FONT_SIZES['2xl'] : FONT_SIZES['3xl'], fontWeight: 800, color: c.text, marginBottom: '12px' } }, 'Complaints and Feedback'),
       React.createElement('p', { style: { color: c.textSecondary, fontSize: FONT_SIZES.md, lineHeight: 1.7, marginBottom: SPACING.xl } }, 'NexaConnect takes all complaints seriously. Your feedback helps us maintain a safe, high-quality marketplace for NDIS participants and providers.'),
