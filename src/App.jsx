@@ -299,6 +299,7 @@ function Badge({ children, variant = 'default', size = 'sm', style: sx }) {
     error: { background: `${COLORS.error}20`, color: COLORS.error },
     info: { background: `${COLORS.info}20`, color: COLORS.info },
     premium: { background: 'linear-gradient(135deg, #F59E0B20, #EF444420)', color: '#F59E0B' },
+    elite: { background: 'linear-gradient(135deg, #F59E0B30, #D9770640)', color: '#D97706' },
     pro: { background: `${COLORS.primary[500]}20`, color: COLORS.primary[400] },
     professional: { background: `${COLORS.primary[500]}20`, color: COLORS.primary[400] },
     free: { background: `${c.textMuted}20`, color: c.textMuted },
@@ -394,6 +395,42 @@ function Select({ label, value, onChange, options, style: sx }) {
         backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center',
       },
     }, options.map((o, i) => React.createElement('option', { key: i, value: typeof o === 'string' ? o : o.value }, typeof o === 'string' ? o : o.label))),
+  );
+}
+
+function MultiSelectChips({ label, options, selected = [], onChange }) {
+  const { theme } = useTheme();
+  const c = COLORS[theme];
+  const responsive = useResponsive();
+  const toggle = (val) => {
+    onChange(selected.includes(val) ? selected.filter(s => s !== val) : [...selected, val]);
+  };
+  return React.createElement('div', { style: { marginBottom: '16px' } },
+    label && React.createElement('label', {
+      style: { display: 'block', marginBottom: '8px', fontSize: FONT_SIZES.sm, fontWeight: 600, color: c.text },
+    }, label),
+    React.createElement('div', {
+      style: {
+        display: 'grid', gridTemplateColumns: responsive.isMobile ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)',
+        gap: '8px',
+      },
+    }, options.map((opt, i) => {
+      const val = typeof opt === 'string' ? opt : opt.value || opt.id;
+      const lbl = typeof opt === 'string' ? opt : opt.label || opt.name;
+      const isSelected = selected.includes(val);
+      return React.createElement('button', {
+        key: i, type: 'button',
+        onClick: () => toggle(val),
+        style: {
+          padding: '8px 12px', borderRadius: RADIUS.md, fontSize: FONT_SIZES.sm,
+          fontFamily: FONTS.sans, cursor: 'pointer', transition: 'all 0.15s',
+          border: `1.5px solid ${isSelected ? COLORS.primary[500] : c.border}`,
+          background: isSelected ? COLORS.primary[500] + '15' : c.surface,
+          color: isSelected ? COLORS.primary[500] : c.text,
+          fontWeight: isSelected ? 600 : 400, textAlign: 'center',
+        },
+      }, lbl);
+    })),
   );
 }
 
@@ -704,7 +741,7 @@ const CATEGORIES = [
 const SUBURBS = ['Newcastle','Maitland','Cessnock','Raymond Terrace','Lake Macquarie','Charlestown','Belmont','Warners Bay','Toronto','Gosford','Wyong','Tuggerah','The Entrance','Muswellbrook','Singleton','Nelson Bay','Kurri Kurri','Morisset','Swansea','Merewether'];
 
 const PROVIDERS_DATA = [
-  { id:'p1',name:'Sunshine Support Services',email:'sunshine@provider.com.au',password:'password',tier:'premium',verified:true,
+  { id:'p1',name:'Sunshine Support Services',email:'sunshine@provider.com.au',password:'password',tier:'elite',verified:true,
     workerScreeningStatus:'verified',workerScreeningNumber:'WSC-2024-001234',workerScreeningExpiry:'2026-08-15',
     categories:['daily-living','community','respite'],suburb:'Newcastle',state:'NSW',postcode:'2300',phone:'02 4976 5432',website:'www.sunshinesupport.com.au',
     description:'Sunshine Support Services has been providing exceptional disability support across the Hunter Region for over 12 years. Our team of 50+ qualified support workers deliver person-centred care.',
@@ -743,7 +780,7 @@ const PROVIDERS_DATA = [
     founded:2018,teamSize:'15',languages:['English','Hindi','Punjabi'],
     features:['48hr processing','Real-time tracking','Monthly reports','Dedicated manager'],
     viewsThisMonth:189,enquiriesThisMonth:22,bookingsThisMonth:18 },
-  { id:'p4',name:'Accessible Living Solutions',email:'als@provider.com.au',password:'password',tier:'premium',verified:true,
+  { id:'p4',name:'Accessible Living Solutions',email:'als@provider.com.au',password:'password',tier:'elite',verified:true,
     workerScreeningStatus:'pending',workerScreeningNumber:'',workerScreeningExpiry:'',
     categories:['accommodation','assistive-tech','daily-living'],suburb:'Raymond Terrace',state:'NSW',postcode:'2324',phone:'02 4987 2109',website:'www.accessibleliving.com.au',
     description:'Comprehensive supported accommodation and assistive technology. We operate 8 SIL houses across the Hunter Region.',
@@ -1225,7 +1262,7 @@ const NOTIFICATIONS_DATA = [
 // ── Analytics Data ──
 const ANALYTICS_MONTHS = ['Jul','Aug','Sep','Oct','Nov','Dec','Jan'];
 function generateAnalytics(provider) {
-  const base = provider.tier === 'premium' ? 300 : provider.tier === 'professional' ? 150 : 50;
+  const base = provider.tier === 'elite' ? 450 : provider.tier === 'premium' ? 300 : provider.tier === 'professional' ? 150 : 50;
   return ANALYTICS_MONTHS.map((month, i) => ({
     month,
     views: Math.floor(base * (0.8 + Math.random() * 0.6) + i * 15),
@@ -1258,7 +1295,60 @@ const PLANS = [
     stripePriceIdMonthly:'price_1T4xQIBbYMwhcgg9gLXhv8dG',stripePriceIdYearly:'price_1T4xQnBbYMwhcgg9YJvx5b50',
     features:['Top search placement','Verified provider badge','Direct booking system','Lead generation tools','Promoted listings','Dedicated account manager','Unlimited photos','Full analytics suite'],
     limits:{ descLength:5000, enquiriesPerMonth:Infinity, photos:Infinity, analytics:true, directBooking:true, verified:true, promoted:true }},
+  { id:'elite',name:'Elite',price:349,priceAnnual:279,popular:false,
+    stripePriceIdMonthly:'price_1T5NAQBbYMwhcgg9LsEQTFsM',stripePriceIdYearly:'price_1T5NB9BbYMwhcgg9wffdaMoo',
+    features:['Everything in Premium','Homepage featured spot','Advanced analytics dashboard','Dedicated support badge','Priority customer support','Custom branding options','White-glove onboarding','API access'],
+    limits:{ descLength:10000, enquiriesPerMonth:Infinity, photos:Infinity, analytics:true, directBooking:true, verified:true, promoted:true, featured:true, advancedAnalytics:true }},
 ];
+
+// ── Feature Gating ──
+const TIER_RANK = { starter: 0, professional: 1, premium: 2, elite: 3 };
+const FEATURE_MIN_TIER = {
+  analytics: 'professional',
+  reviewResponse: 'professional',
+  additionalPhotos: 'professional',
+  directBooking: 'premium',
+  verifiedBadge: 'premium',
+  featuredSpot: 'elite',
+  advancedAnalytics: 'elite',
+  dedicatedSupport: 'elite',
+};
+function canAccessFeature(tier, feature) {
+  const minTier = FEATURE_MIN_TIER[feature];
+  if (!minTier) return true;
+  return (TIER_RANK[tier] || 0) >= (TIER_RANK[minTier] || 0);
+}
+function getRequiredTier(feature) {
+  return FEATURE_MIN_TIER[feature] || 'starter';
+}
+
+// ── LockedFeature Component ──
+function LockedFeature({ tier, feature, children }) {
+  const { theme } = useTheme();
+  const { dispatch } = useApp();
+  const c = COLORS[theme];
+  const requiredTier = getRequiredTier(feature);
+  if (canAccessFeature(tier, feature)) return children;
+  return React.createElement('div', { style: { position: 'relative', borderRadius: RADIUS.lg, overflow: 'hidden' } },
+    React.createElement('div', { style: { filter: 'blur(4px)', opacity: 0.4, pointerEvents: 'none' } }, children),
+    React.createElement('div', {
+      style: {
+        position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        background: `${c.surface}CC`, borderRadius: RADIUS.lg, zIndex: 2,
+      },
+    },
+      React.createElement('span', { style: { fontSize: '32px', marginBottom: '12px' } }, Icons.lock(32, c.textMuted)),
+      React.createElement('p', { style: { fontSize: FONT_SIZES.base, fontWeight: 700, color: c.text, marginBottom: '4px' } },
+        'Feature Locked'),
+      React.createElement('p', { style: { fontSize: FONT_SIZES.sm, color: c.textSecondary, marginBottom: '16px' } },
+        `Upgrade to ${requiredTier.charAt(0).toUpperCase() + requiredTier.slice(1)} to unlock`),
+      React.createElement(Button, {
+        variant: 'primary', size: 'sm',
+        onClick: () => dispatch({type:ACTION_TYPES.NAV_GOTO,payload:{route:'pricing'}}),
+      }, 'View Plans'),
+    ),
+  );
+}
 
 // ── Response Time Calculator ──
 function calcResponseTime(provider, enquiries) {
@@ -1366,7 +1456,7 @@ function rankProviders(providers, query, filters) {
 
   // Sort by tier weight + rating + response rate
   results.sort((a, b) => {
-    const tierWeight = { premium: 100, professional: 50, starter: 0 };
+    const tierWeight = { elite: 150, premium: 100, professional: 50, starter: 0 };
     const scoreA = tierWeight[a.tier] + (a.rating * 10) + (a.responseRate * 0.5);
     const scoreB = tierWeight[b.tier] + (b.rating * 10) + (b.responseRate * 0.5);
     return scoreB - scoreA;
@@ -1435,6 +1525,12 @@ const ACTION_TYPES = {
   SUBMIT_REPORT: 'SUBMIT_REPORT',
   UPDATE_REPORT_STATUS: 'UPDATE_REPORT_STATUS',
   SET_ONBOARDING_STEP: 'SET_ONBOARDING_STEP',
+  SET_ONBOARDING_WIZARD_STEP: 'SET_ONBOARDING_WIZARD_STEP',
+  UPDATE_ONBOARDING_DRAFT: 'UPDATE_ONBOARDING_DRAFT',
+  MARK_ONBOARDING_STEP_COMPLETE: 'MARK_ONBOARDING_STEP_COMPLETE',
+  SET_ONBOARDING_COMPLETED: 'SET_ONBOARDING_COMPLETED',
+  LOAD_ONBOARDING_DRAFT: 'LOAD_ONBOARDING_DRAFT',
+  CLEAR_ONBOARDING_DRAFT: 'CLEAR_ONBOARDING_DRAFT',
 };
 
 function getInitialState() {
@@ -1469,6 +1565,25 @@ function getInitialState() {
     compareProviders: [],
     reports: [],
     notifications: NOTIFICATIONS_DATA,
+    onboardingWizard: (() => {
+      let ob = { currentStep: 0, completedSteps: [], draft: {
+        businessName: '', abn: '', phone: '', website: '', suburb: '', state: '', postcode: '', founded: '', teamSize: '',
+        categories: [], serviceAreas: [], planTypes: [], languages: [],
+        shortDescription: '', description: '', features: [],
+        availability: {
+          mon: { open: false, start: '09:00', end: '17:00' }, tue: { open: false, start: '09:00', end: '17:00' },
+          wed: { open: false, start: '09:00', end: '17:00' }, thu: { open: false, start: '09:00', end: '17:00' },
+          fri: { open: false, start: '09:00', end: '17:00' }, sat: { open: false, start: '09:00', end: '17:00' },
+          sun: { open: false, start: '09:00', end: '17:00' },
+        },
+        photos: [],
+      }, isComplete: false };
+      try {
+        const savedDraft = JSON.parse(localStorage.getItem('nexaconnect_onboarding_draft') || 'null');
+        if (savedDraft) { ob.draft = { ...ob.draft, ...savedDraft.draft }; ob.currentStep = savedDraft.currentStep || 0; ob.completedSteps = savedDraft.completedSteps || []; }
+      } catch(e) {}
+      return ob;
+    })(),
   };
 }
 
@@ -1590,6 +1705,26 @@ function appReducer(state, action) {
       return { ...state, reports: state.reports.map(r => r.id === action.payload.id ? { ...r, status: action.payload.status } : r) };
     case ACTION_TYPES.SET_ONBOARDING_STEP:
       return { ...state, providers: state.providers.map(p => p.id === action.payload.id ? { ...p, onboardingStep: action.payload.step } : p) };
+    case ACTION_TYPES.SET_ONBOARDING_WIZARD_STEP:
+      return { ...state, onboardingWizard: { ...state.onboardingWizard, currentStep: action.payload } };
+    case ACTION_TYPES.UPDATE_ONBOARDING_DRAFT:
+      return { ...state, onboardingWizard: { ...state.onboardingWizard, draft: { ...state.onboardingWizard.draft, ...action.payload } } };
+    case ACTION_TYPES.MARK_ONBOARDING_STEP_COMPLETE: {
+      const steps = state.onboardingWizard.completedSteps;
+      return { ...state, onboardingWizard: { ...state.onboardingWizard, completedSteps: steps.includes(action.payload) ? steps : [...steps, action.payload] } };
+    }
+    case ACTION_TYPES.SET_ONBOARDING_COMPLETED:
+      return { ...state, onboardingWizard: { ...state.onboardingWizard, isComplete: true } };
+    case ACTION_TYPES.LOAD_ONBOARDING_DRAFT:
+      return { ...state, onboardingWizard: { ...state.onboardingWizard, ...action.payload } };
+    case ACTION_TYPES.CLEAR_ONBOARDING_DRAFT:
+      return { ...state, onboardingWizard: { currentStep: 0, completedSteps: [], draft: {
+        businessName: '', abn: '', phone: '', website: '', suburb: '', state: '', postcode: '', founded: '', teamSize: '',
+        categories: [], serviceAreas: [], planTypes: [], languages: [],
+        shortDescription: '', description: '', features: [],
+        availability: { mon: { open: false, start: '09:00', end: '17:00' }, tue: { open: false, start: '09:00', end: '17:00' }, wed: { open: false, start: '09:00', end: '17:00' }, thu: { open: false, start: '09:00', end: '17:00' }, fri: { open: false, start: '09:00', end: '17:00' }, sat: { open: false, start: '09:00', end: '17:00' }, sun: { open: false, start: '09:00', end: '17:00' } },
+        photos: [],
+      }, isComplete: false } };
     case ACTION_TYPES.MARK_NOTIFICATION_READ:
       return { ...state, notifications: (state.notifications || []).map(n => n.id === action.payload ? { ...n, read: true } : n) };
     case ACTION_TYPES.MARK_ALL_NOTIFICATIONS_READ:
@@ -1737,7 +1872,7 @@ function Navbar() {
   const { state, dispatch } = useApp();
   const responsive = useResponsive();
   const c = COLORS[theme];
-  const isMarketing = ['landing','pricing','login','register','directory','provider-profile','help','contact','ndis-resources','about','privacy','terms','ndis-code-of-conduct','complaints'].includes(state.route);
+  const isMarketing = ['landing','pricing','login','register','directory','provider-profile','help','contact','ndis-resources','about','privacy','terms','ndis-code-of-conduct','complaints','provider-onboarding'].includes(state.route);
   const isLoggedIn = !!state.user;
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -1897,7 +2032,7 @@ function Sidebar() {
   const c = COLORS[theme];
 
   if (!state.user) return null;
-  const isMarketing = ['landing','pricing','login','register','directory','provider-profile','help','contact','ndis-resources','about','privacy','terms','ndis-code-of-conduct','complaints'].includes(state.route);
+  const isMarketing = ['landing','pricing','login','register','directory','provider-profile','help','contact','ndis-resources','about','privacy','terms','ndis-code-of-conduct','complaints','provider-onboarding'].includes(state.route);
   if (isMarketing) return null;
 
   const role = state.user.role;
@@ -2059,7 +2194,7 @@ function PageShell({ children }) {
   const { state } = useApp();
   const responsive = useResponsive();
   const c = COLORS[theme];
-  const isMarketing = ['landing','pricing','login','register','directory','provider-profile','help','contact','ndis-resources','about','privacy','terms','ndis-code-of-conduct','complaints'].includes(state.route);
+  const isMarketing = ['landing','pricing','login','register','directory','provider-profile','help','contact','ndis-resources','about','privacy','terms','ndis-code-of-conduct','complaints','provider-onboarding'].includes(state.route);
   const showSidebar = state.user && !isMarketing;
   const sidebarWidth = showSidebar && state.sidebarOpen && !responsive.isMobile ? 240 : 0;
 
@@ -2383,20 +2518,23 @@ function PricingPage() {
       // Pricing Cards
       React.createElement('div', {
         style: {
-          display: 'grid', gridTemplateColumns: responsive.isMobile ? '1fr' : 'repeat(3, 1fr)',
-          gap: '24px', maxWidth: '1000px', margin: '0 auto',
+          display: 'grid',
+          gridTemplateColumns: responsive.isMobile ? '1fr' : responsive.isTablet ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
+          gap: '20px', maxWidth: '1200px', margin: '0 auto',
         },
       },
         PLANS.map((plan, i) => {
           const price = state.billingCycle === 'annual' ? plan.priceAnnual : plan.price;
           const isPopular = plan.popular;
+          const isElite = plan.id === 'elite';
           return React.createElement('div', {
             key: plan.id,
             style: {
               ...cardStyle(theme), padding: '32px 24px', position: 'relative',
-              border: isPopular ? `2px solid ${COLORS.primary[500]}` : `1px solid ${c.border}`,
-              transform: isPopular && !responsive.isMobile ? 'scale(1.05)' : undefined,
-              zIndex: isPopular ? 1 : 0,
+              border: isElite ? '2px solid #D97706' : isPopular ? `2px solid ${COLORS.primary[500]}` : `1px solid ${c.border}`,
+              transform: (isPopular || isElite) && !responsive.isMobile ? 'scale(1.03)' : undefined,
+              zIndex: isPopular || isElite ? 1 : 0,
+              background: isElite ? `linear-gradient(180deg, ${c.surface} 0%, #D9770610 100%)` : cardStyle(theme).background,
             },
           },
             isPopular && React.createElement('div', {
@@ -2406,23 +2544,35 @@ function PricingPage() {
                 borderRadius: RADIUS.full, fontSize: FONT_SIZES.xs, fontWeight: 700,
               },
             }, 'Most Popular'),
-            React.createElement('h3', { style: { fontSize: FONT_SIZES.xl, fontWeight: 800, color: c.text, marginBottom: '8px' } }, plan.name),
+            isElite && React.createElement('div', {
+              style: {
+                position: 'absolute', top: '-12px', left: '50%', transform: 'translateX(-50%)',
+                background: 'linear-gradient(135deg, #D97706, #F59E0B)', color: '#fff', padding: '4px 16px',
+                borderRadius: RADIUS.full, fontSize: FONT_SIZES.xs, fontWeight: 700,
+                display: 'flex', alignItems: 'center', gap: '4px',
+              },
+            }, Icons.crown(12, '#fff'), ' Elite'),
+            React.createElement('h3', {
+              style: { fontSize: FONT_SIZES.xl, fontWeight: 800, marginBottom: '8px',
+                color: isElite ? '#D97706' : c.text },
+            }, plan.name),
             React.createElement('div', { style: { marginBottom: '24px' } },
               React.createElement('span', { style: { fontSize: FONT_SIZES['4xl'], fontWeight: 900, color: c.text } },
                 price === 0 ? 'Free' : `$${price}`),
               price > 0 && React.createElement('span', { style: { fontSize: FONT_SIZES.sm, color: c.textMuted } }, '/mo'),
             ),
             React.createElement(Button, {
-              variant: isPopular ? 'primary' : 'secondary', fullWidth: true,
+              variant: isElite ? 'primary' : isPopular ? 'primary' : 'secondary', fullWidth: true,
               onClick: () => dispatch({type:ACTION_TYPES.NAV_GOTO,payload:{route:'register'}}),
-              style: { marginBottom: '24px' },
+              style: isElite ? { marginBottom: '24px', background: 'linear-gradient(135deg, #D97706, #F59E0B)', border: 'none' } : { marginBottom: '24px' },
             }, price === 0 ? 'Get Started Free' : 'Start Free Trial'),
             React.createElement(Divider),
             React.createElement('ul', { style: { listStyle: 'none', textAlign: 'left' } },
               plan.features.map((f, j) => React.createElement('li', {
                 key: j, style: { display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '10px' },
               },
-                React.createElement('span', { style: { color: COLORS.success, marginTop: '2px', flexShrink: 0 } }, Icons.check(16, COLORS.success)),
+                React.createElement('span', { style: { color: isElite ? '#D97706' : COLORS.success, marginTop: '2px', flexShrink: 0 } },
+                  Icons.check(16, isElite ? '#D97706' : COLORS.success)),
                 React.createElement('span', { style: { fontSize: FONT_SIZES.sm, color: c.textSecondary } }, f),
               )),
             ),
@@ -2611,9 +2761,14 @@ function RegisterPage() {
       dispatch({type:ACTION_TYPES.UPDATE_PROVIDER_PROFILE,payload:newProvider});
       const user = { id: newProvider.id, name: newProvider.name, email: newProvider.email, role: 'provider', tier: 'starter' };
       dispatch({type:ACTION_TYPES.SET_USER,payload:user});
-      dispatch({type:ACTION_TYPES.NAV_GOTO,payload:{route:'provider-dashboard'}});
-      dispatch({type:ACTION_TYPES.SET_DASHBOARD_TAB,payload:'overview'});
-      addToast('Welcome to NexaConnect! Set up your profile to get started.', 'success');
+      dispatch({type:ACTION_TYPES.NAV_GOTO,payload:{route:'provider-onboarding'}});
+      dispatch({type:ACTION_TYPES.UPDATE_ONBOARDING_DRAFT,payload:{
+        businessName: formData.businessName || formData.name || '',
+        phone: formData.phone || '',
+        suburb: formData.suburb || '',
+        categories: formData.category ? [formData.category] : [],
+      }});
+      addToast('Welcome to NexaConnect! Let\'s set up your profile.', 'success');
     } else {
       const newParticipant = {
         id: supabaseUserId || ('u' + (state.participants.length + 1)), name: formData.name,
@@ -2753,6 +2908,467 @@ function RegisterPage() {
 
 
 /* ═══════════════════════════════════════════════════════════════
+   Phase 2: Provider Onboarding Wizard
+   ═══════════════════════════════════════════════════════════════ */
+
+const ONBOARDING_STEPS = [
+  { key: 'business', label: 'Business Details' },
+  { key: 'services', label: 'Services' },
+  { key: 'profile', label: 'Profile Content' },
+  { key: 'availability', label: 'Availability' },
+  { key: 'photos', label: 'Photos' },
+  { key: 'review', label: 'Review & Submit' },
+];
+
+const PLAN_TYPE_OPTIONS = ['Agency Managed', 'Plan Managed', 'Self Managed'];
+const LANGUAGE_OPTIONS = ['English', 'Mandarin', 'Cantonese', 'Vietnamese', 'Arabic', 'Greek', 'Italian', 'Hindi', 'Tagalog', 'Korean', 'Spanish', 'Auslan'];
+const TIME_OPTIONS = (() => { const t = []; for (let h = 6; h <= 21; h++) { for (let m = 0; m < 60; m += 30) { const hh = String(h).padStart(2, '0'); const mm = String(m).padStart(2, '0'); t.push(hh + ':' + mm); } } return t; })();
+
+function WizardStepIndicator({ currentStep, completedSteps, onStepClick }) {
+  const { theme } = useTheme();
+  const c = COLORS[theme];
+  const responsive = useResponsive();
+  return React.createElement('div', {
+    style: { display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 0', marginBottom: '24px', position: 'relative' },
+  },
+    ONBOARDING_STEPS.map((step, i) => {
+      const isCompleted = completedSteps.includes(i);
+      const isCurrent = i === currentStep;
+      const isFuture = !isCompleted && !isCurrent;
+      const canClick = isCompleted;
+      return React.createElement(React.Fragment, { key: i },
+        i > 0 && React.createElement('div', {
+          style: {
+            flex: 1, height: '2px', maxWidth: responsive.isMobile ? '20px' : '60px',
+            background: isCompleted || isCurrent ? COLORS.primary[500] : c.border,
+            transition: 'background 0.3s',
+          },
+        }),
+        React.createElement('div', {
+          onClick: canClick ? () => onStepClick(i) : undefined,
+          style: { display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: canClick ? 'pointer' : 'default', position: 'relative' },
+        },
+          React.createElement('div', {
+            style: {
+              width: 36, height: 36, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: FONT_SIZES.sm, fontWeight: 700, fontFamily: FONTS.sans, transition: 'all 0.3s',
+              background: isCompleted ? COLORS.success : isCurrent ? COLORS.primary[500] : c.surface,
+              color: isCompleted || isCurrent ? '#fff' : c.textMuted,
+              border: `2px solid ${isCompleted ? COLORS.success : isCurrent ? COLORS.primary[500] : c.border}`,
+            },
+          }, isCompleted ? '\u2713' : String(i + 1)),
+          !responsive.isMobile && React.createElement('span', {
+            style: {
+              fontSize: '11px', marginTop: '6px', color: isCurrent ? COLORS.primary[500] : isCompleted ? COLORS.success : c.textMuted,
+              fontWeight: isCurrent ? 600 : 400, whiteSpace: 'nowrap', position: 'absolute', top: '42px',
+            },
+          }, step.label),
+        ),
+      );
+    }),
+  );
+}
+
+function ProviderOnboardingWizard() {
+  const { theme } = useTheme();
+  const { state, dispatch } = useApp();
+  const { addToast } = useToast();
+  const responsive = useResponsive();
+  const c = COLORS[theme];
+  const wizard = state.onboardingWizard;
+  const { currentStep, completedSteps, draft } = wizard;
+  const [errors, setErrors] = useState({});
+  const [featureInput, setFeatureInput] = useState('');
+
+  // Persist draft to localStorage
+  useEffect(() => {
+    if (!wizard.isComplete) {
+      try {
+        localStorage.setItem('nexaconnect_onboarding_draft', JSON.stringify({
+          draft: wizard.draft, currentStep: wizard.currentStep, completedSteps: wizard.completedSteps,
+        }));
+      } catch(e) {}
+    }
+  }, [wizard.draft, wizard.currentStep, wizard.completedSteps, wizard.isComplete]);
+
+  // Redirect check: if onboarding is complete, go to dashboard
+  useEffect(() => {
+    if (wizard.isComplete) {
+      dispatch({ type: ACTION_TYPES.NAV_GOTO, payload: { route: 'provider-dashboard' } });
+    }
+  }, [wizard.isComplete]);
+
+  const updateDraft = (updates) => dispatch({ type: ACTION_TYPES.UPDATE_ONBOARDING_DRAFT, payload: updates });
+
+  const validateStep = (step) => {
+    const errs = {};
+    switch (step) {
+      case 0:
+        if (!draft.businessName.trim()) errs.businessName = 'Business name is required';
+        if (!draft.suburb.trim()) errs.suburb = 'Suburb is required';
+        break;
+      case 1:
+        if (!draft.categories.length) errs.categories = 'Select at least one service category';
+        break;
+      case 2:
+        if (!draft.shortDescription || draft.shortDescription.trim().length < 20) errs.shortDescription = 'Short description must be at least 20 characters';
+        break;
+      case 3: {
+        const days = ['mon','tue','wed','thu','fri','sat','sun'];
+        const anyOpen = days.some(d => draft.availability[d] && draft.availability[d].open);
+        if (!anyOpen) errs.availability = 'At least one day must be open';
+        break;
+      }
+    }
+    return errs;
+  };
+
+  const goToStep = (step) => {
+    dispatch({ type: ACTION_TYPES.SET_ONBOARDING_WIZARD_STEP, payload: step });
+    setErrors({});
+  };
+
+  const handleNext = () => {
+    const errs = validateStep(currentStep);
+    if (Object.keys(errs).length > 0) {
+      setErrors(errs);
+      addToast(Object.values(errs)[0], 'error');
+      return;
+    }
+    setErrors({});
+    dispatch({ type: ACTION_TYPES.MARK_ONBOARDING_STEP_COMPLETE, payload: currentStep });
+    if (currentStep < 5) goToStep(currentStep + 1);
+  };
+
+  const handleBack = () => { if (currentStep > 0) goToStep(currentStep - 1); };
+
+  const handleSkip = () => {
+    if (currentStep === 4) {
+      dispatch({ type: ACTION_TYPES.MARK_ONBOARDING_STEP_COMPLETE, payload: 4 });
+      goToStep(5);
+    }
+  };
+
+  const handleSaveAndContinue = () => {
+    addToast('Progress saved! You can continue setup anytime.', 'success');
+    dispatch({ type: ACTION_TYPES.NAV_GOTO, payload: { route: 'provider-dashboard' } });
+    dispatch({ type: ACTION_TYPES.SET_DASHBOARD_TAB, payload: 'overview' });
+  };
+
+  const handleComplete = () => {
+    if (!state.user) return;
+    const days = ['mon','tue','wed','thu','fri','sat','sun'];
+    const availObj = {};
+    days.forEach(d => {
+      const da = draft.availability[d];
+      availObj[d] = da && da.open ? da.start.replace(':','') < '1200' ? da.start.replace(':00','').replace(':30',':30') + (da.start < '12:00' ? 'am' : 'pm') + '-' + da.end.replace(':00','').replace(':30',':30') + (da.end < '12:00' ? 'am' : 'pm') : da.start + '-' + da.end : 'Closed';
+    });
+    const profileData = {
+      id: state.user.id,
+      name: draft.businessName, phone: draft.phone, website: draft.website,
+      suburb: draft.suburb, state: draft.state || 'NSW', postcode: draft.postcode || '2300',
+      categories: draft.categories.length ? draft.categories : ['daily-living'],
+      serviceAreas: draft.serviceAreas.length ? draft.serviceAreas : [draft.suburb || 'Newcastle'],
+      planTypes: draft.planTypes.length ? draft.planTypes : ['Plan Managed'],
+      languages: draft.languages.length ? draft.languages : ['English'],
+      shortDescription: draft.shortDescription, description: draft.description,
+      features: draft.features, founded: draft.founded || 2026, teamSize: draft.teamSize || '1',
+      availability: availObj, abn: draft.abn,
+      onboardingComplete: true,
+    };
+    dispatch({ type: ACTION_TYPES.UPDATE_PROVIDER_PROFILE, payload: profileData });
+    dispatch({ type: ACTION_TYPES.SET_USER, payload: { ...state.user, name: draft.businessName } });
+    dispatch({ type: ACTION_TYPES.SET_ONBOARDING_COMPLETED });
+    dispatch({ type: ACTION_TYPES.CLEAR_ONBOARDING_DRAFT });
+    try { localStorage.removeItem('nexaconnect_onboarding_draft'); } catch(e) {}
+    addToast('Your profile is live! Welcome to NexaConnect.', 'success');
+    dispatch({ type: ACTION_TYPES.NAV_GOTO, payload: { route: 'provider-dashboard' } });
+    dispatch({ type: ACTION_TYPES.SET_DASHBOARD_TAB, payload: 'overview' });
+  };
+
+  const cardStyle = {
+    background: c.surface, borderRadius: RADIUS.xl, padding: responsive.isMobile ? '20px' : '32px',
+    border: `1px solid ${c.border}`, maxWidth: '720px', margin: '0 auto',
+  };
+
+  const btnPrimary = {
+    padding: '12px 28px', borderRadius: RADIUS.md, border: 'none', cursor: 'pointer',
+    background: COLORS.primary[500], color: '#fff', fontWeight: 600, fontSize: FONT_SIZES.base, fontFamily: FONTS.sans,
+  };
+  const btnSecondary = {
+    padding: '12px 28px', borderRadius: RADIUS.md, border: `1.5px solid ${c.border}`, cursor: 'pointer',
+    background: 'transparent', color: c.text, fontWeight: 500, fontSize: FONT_SIZES.base, fontFamily: FONTS.sans,
+  };
+  const btnGhost = {
+    padding: '12px 20px', borderRadius: RADIUS.md, border: 'none', cursor: 'pointer',
+    background: 'transparent', color: c.textSecondary, fontWeight: 500, fontSize: FONT_SIZES.sm, fontFamily: FONTS.sans,
+  };
+
+  // ── Step 0: Business Details ──
+  const renderBusinessDetails = () => React.createElement('div', null,
+    React.createElement('h3', { style: { fontSize: FONT_SIZES.xl, fontWeight: 700, marginBottom: '4px', color: c.text } }, 'Business Details'),
+    React.createElement('p', { style: { color: c.textSecondary, fontSize: FONT_SIZES.sm, marginBottom: '24px' } }, 'Tell us about your organisation.'),
+    React.createElement(Input, { label: 'Business Name *', value: draft.businessName, onChange: (v) => updateDraft({ businessName: v }), placeholder: 'e.g. Sunshine Support Services', error: errors.businessName }),
+    React.createElement('div', { style: { display: 'grid', gridTemplateColumns: responsive.isMobile ? '1fr' : '1fr 1fr', gap: '0 16px' } },
+      React.createElement(Input, { label: 'ABN', value: draft.abn, onChange: (v) => updateDraft({ abn: v }), placeholder: '00 000 000 000' }),
+      React.createElement(Input, { label: 'Phone', value: draft.phone, onChange: (v) => updateDraft({ phone: v }), placeholder: '02 0000 0000' }),
+    ),
+    React.createElement('div', { style: { display: 'grid', gridTemplateColumns: responsive.isMobile ? '1fr' : '1fr 1fr', gap: '0 16px' } },
+      React.createElement(Input, { label: 'Website', value: draft.website, onChange: (v) => updateDraft({ website: v }), placeholder: 'www.example.com.au' }),
+      React.createElement(Input, { label: 'Suburb *', value: draft.suburb, onChange: (v) => updateDraft({ suburb: v }), placeholder: 'e.g. Newcastle', error: errors.suburb }),
+    ),
+    React.createElement('div', { style: { display: 'grid', gridTemplateColumns: responsive.isMobile ? '1fr' : '1fr 1fr 1fr', gap: '0 16px' } },
+      React.createElement(Select, { label: 'State', value: draft.state || '', onChange: (v) => updateDraft({ state: v }),
+        options: [{value:'',label:'Select state'},'NSW','VIC','QLD','SA','WA','TAS','NT','ACT'] }),
+      React.createElement(Input, { label: 'Postcode', value: draft.postcode, onChange: (v) => updateDraft({ postcode: v }), placeholder: '2300' }),
+      React.createElement(Input, { label: 'Founded Year', value: draft.founded, onChange: (v) => updateDraft({ founded: v }), placeholder: '2020' }),
+    ),
+    React.createElement(Select, { label: 'Team Size', value: draft.teamSize || '', onChange: (v) => updateDraft({ teamSize: v }),
+      options: [{value:'',label:'Select size'},'1','2-5','6-10','11-25','26-50','50+'] }),
+  );
+
+  // ── Step 1: Services ──
+  const renderServices = () => React.createElement('div', null,
+    React.createElement('h3', { style: { fontSize: FONT_SIZES.xl, fontWeight: 700, marginBottom: '4px', color: c.text } }, 'Services'),
+    React.createElement('p', { style: { color: c.textSecondary, fontSize: FONT_SIZES.sm, marginBottom: '24px' } }, 'What services does your organisation provide?'),
+    React.createElement(MultiSelectChips, {
+      label: 'Service Categories *', options: CATEGORIES, selected: draft.categories,
+      onChange: (v) => updateDraft({ categories: v }),
+    }),
+    errors.categories && React.createElement('p', { style: { color: COLORS.error, fontSize: FONT_SIZES.xs, marginTop: '-8px', marginBottom: '16px' } }, errors.categories),
+    React.createElement(MultiSelectChips, {
+      label: 'Service Areas', options: SUBURBS.map(s => ({ value: s, label: s })), selected: draft.serviceAreas,
+      onChange: (v) => updateDraft({ serviceAreas: v }),
+    }),
+    React.createElement(MultiSelectChips, {
+      label: 'Plan Types Accepted', options: PLAN_TYPE_OPTIONS.map(p => ({ value: p, label: p })), selected: draft.planTypes,
+      onChange: (v) => updateDraft({ planTypes: v }),
+    }),
+    React.createElement(MultiSelectChips, {
+      label: 'Languages Spoken', options: LANGUAGE_OPTIONS.map(l => ({ value: l, label: l })), selected: draft.languages,
+      onChange: (v) => updateDraft({ languages: v }),
+    }),
+  );
+
+  // ── Step 2: Profile Content ──
+  const renderProfileContent = () => React.createElement('div', null,
+    React.createElement('h3', { style: { fontSize: FONT_SIZES.xl, fontWeight: 700, marginBottom: '4px', color: c.text } }, 'Profile Content'),
+    React.createElement('p', { style: { color: c.textSecondary, fontSize: FONT_SIZES.sm, marginBottom: '24px' } }, 'Craft your public profile. This is what participants will see.'),
+    React.createElement('div', { style: { marginBottom: '16px' } },
+      React.createElement('label', { style: { display: 'block', marginBottom: '6px', fontSize: FONT_SIZES.sm, fontWeight: 600, color: c.text } }, 'Short Description * (min 20 chars)'),
+      React.createElement('textarea', {
+        value: draft.shortDescription || '', onChange: (e) => updateDraft({ shortDescription: e.target.value }),
+        placeholder: 'A brief tagline for your listing...', rows: 2,
+        style: {
+          width: '100%', padding: '10px 14px', background: c.surface, color: c.text,
+          border: `1.5px solid ${errors.shortDescription ? COLORS.error : c.border}`, borderRadius: RADIUS.md,
+          fontSize: FONT_SIZES.base, fontFamily: FONTS.sans, outline: 'none', resize: 'vertical', boxSizing: 'border-box',
+        },
+      }),
+      React.createElement('span', { style: { fontSize: FONT_SIZES.xs, color: (draft.shortDescription || '').length >= 20 ? COLORS.success : c.textMuted } },
+        (draft.shortDescription || '').length + '/20 min characters'),
+      errors.shortDescription && React.createElement('p', { style: { color: COLORS.error, fontSize: FONT_SIZES.xs, margin: '4px 0 0' } }, errors.shortDescription),
+    ),
+    React.createElement('div', { style: { marginBottom: '16px' } },
+      React.createElement('label', { style: { display: 'block', marginBottom: '6px', fontSize: FONT_SIZES.sm, fontWeight: 600, color: c.text } }, 'Full Description'),
+      React.createElement('textarea', {
+        value: draft.description || '', onChange: (e) => updateDraft({ description: e.target.value }),
+        placeholder: 'Tell participants about your organisation, your approach, and what makes you different...', rows: 5,
+        style: {
+          width: '100%', padding: '10px 14px', background: c.surface, color: c.text,
+          border: `1.5px solid ${c.border}`, borderRadius: RADIUS.md,
+          fontSize: FONT_SIZES.base, fontFamily: FONTS.sans, outline: 'none', resize: 'vertical', boxSizing: 'border-box',
+        },
+      }),
+    ),
+    React.createElement('div', { style: { marginBottom: '16px' } },
+      React.createElement('label', { style: { display: 'block', marginBottom: '6px', fontSize: FONT_SIZES.sm, fontWeight: 600, color: c.text } }, 'Key Features'),
+      React.createElement('div', { style: { display: 'flex', gap: '8px', marginBottom: '8px' } },
+        React.createElement('input', {
+          value: featureInput, onChange: (e) => setFeatureInput(e.target.value),
+          onKeyDown: (e) => { if (e.key === 'Enter' && featureInput.trim()) { updateDraft({ features: [...(draft.features || []), featureInput.trim()] }); setFeatureInput(''); } },
+          placeholder: 'e.g. NDIS registered, 24/7 support...', style: {
+            flex: 1, padding: '10px 14px', background: c.surface, color: c.text,
+            border: `1.5px solid ${c.border}`, borderRadius: RADIUS.md, fontSize: FONT_SIZES.base, fontFamily: FONTS.sans, outline: 'none',
+          },
+        }),
+        React.createElement('button', {
+          type: 'button', onClick: () => { if (featureInput.trim()) { updateDraft({ features: [...(draft.features || []), featureInput.trim()] }); setFeatureInput(''); } },
+          style: { ...btnPrimary, padding: '10px 16px' },
+        }, 'Add'),
+      ),
+      (draft.features || []).map((f, i) => React.createElement('div', {
+        key: i, style: {
+          display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px',
+          background: COLORS.primary[500] + '15', border: `1px solid ${COLORS.primary[500]}30`, borderRadius: RADIUS.full,
+          fontSize: FONT_SIZES.sm, color: COLORS.primary[500], marginRight: '8px', marginBottom: '8px',
+        },
+      },
+        f,
+        React.createElement('button', {
+          onClick: () => updateDraft({ features: draft.features.filter((_, j) => j !== i) }),
+          style: { background: 'none', border: 'none', color: COLORS.primary[500], cursor: 'pointer', fontFamily: FONTS.sans, fontSize: '16px', padding: '0 2px' },
+        }, '\u00D7'),
+      )),
+    ),
+  );
+
+  // ── Step 3: Availability ──
+  const dayLabels = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
+  const renderAvailability = () => React.createElement('div', null,
+    React.createElement('h3', { style: { fontSize: FONT_SIZES.xl, fontWeight: 700, marginBottom: '4px', color: c.text } }, 'Availability'),
+    React.createElement('p', { style: { color: c.textSecondary, fontSize: FONT_SIZES.sm, marginBottom: '24px' } }, 'Set your weekly operating hours.'),
+    errors.availability && React.createElement('p', { style: { color: COLORS.error, fontSize: FONT_SIZES.sm, marginBottom: '16px', padding: '8px 12px', background: COLORS.error + '15', borderRadius: RADIUS.md } }, errors.availability),
+    Object.entries(dayLabels).map(([key, label]) => {
+      const day = draft.availability[key] || { open: false, start: '09:00', end: '17:00' };
+      return React.createElement('div', {
+        key, style: {
+          display: 'flex', alignItems: 'center', gap: responsive.isMobile ? '8px' : '16px', padding: '12px 0',
+          borderBottom: `1px solid ${c.border}`, flexWrap: responsive.isMobile ? 'wrap' : 'nowrap',
+        },
+      },
+        React.createElement('div', { style: { width: responsive.isMobile ? '100%' : '120px', display: 'flex', alignItems: 'center', gap: '10px' } },
+          React.createElement(Toggle, {
+            checked: day.open,
+            onChange: (v) => updateDraft({ availability: { ...draft.availability, [key]: { ...day, open: v } } }),
+          }),
+          React.createElement('span', { style: { fontSize: FONT_SIZES.sm, fontWeight: 500, color: c.text, minWidth: '80px' } }, label),
+        ),
+        day.open && React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', flex: 1 } },
+          React.createElement('select', {
+            value: day.start, onChange: (e) => updateDraft({ availability: { ...draft.availability, [key]: { ...day, start: e.target.value } } }),
+            style: {
+              padding: '8px 10px', background: c.surface, color: c.text, border: `1.5px solid ${c.border}`,
+              borderRadius: RADIUS.md, fontSize: FONT_SIZES.sm, fontFamily: FONTS.sans, outline: 'none',
+            },
+          }, TIME_OPTIONS.map(t => React.createElement('option', { key: t, value: t }, t))),
+          React.createElement('span', { style: { color: c.textMuted, fontSize: FONT_SIZES.sm } }, 'to'),
+          React.createElement('select', {
+            value: day.end, onChange: (e) => updateDraft({ availability: { ...draft.availability, [key]: { ...day, end: e.target.value } } }),
+            style: {
+              padding: '8px 10px', background: c.surface, color: c.text, border: `1.5px solid ${c.border}`,
+              borderRadius: RADIUS.md, fontSize: FONT_SIZES.sm, fontFamily: FONTS.sans, outline: 'none',
+            },
+          }, TIME_OPTIONS.map(t => React.createElement('option', { key: t, value: t }, t))),
+        ),
+        !day.open && React.createElement('span', { style: { color: c.textMuted, fontSize: FONT_SIZES.sm, fontStyle: 'italic' } }, 'Closed'),
+      );
+    }),
+  );
+
+  // ── Step 4: Photos ──
+  const renderPhotos = () => React.createElement('div', null,
+    React.createElement('h3', { style: { fontSize: FONT_SIZES.xl, fontWeight: 700, marginBottom: '4px', color: c.text } }, 'Photos'),
+    React.createElement('p', { style: { color: c.textSecondary, fontSize: FONT_SIZES.sm, marginBottom: '24px' } }, 'Add photos to showcase your services. You can skip this step and add photos later.'),
+    React.createElement('div', {
+      style: {
+        border: `2px dashed ${c.border}`, borderRadius: RADIUS.xl, padding: '48px 24px',
+        textAlign: 'center', background: c.surfaceAlt || c.surface,
+      },
+    },
+      React.createElement('div', { style: { fontSize: '48px', marginBottom: '12px' } }, '\uD83D\uDCF7'),
+      React.createElement('p', { style: { fontSize: FONT_SIZES.base, fontWeight: 600, color: c.text, marginBottom: '8px' } }, 'Photo upload coming soon'),
+      React.createElement('p', { style: { fontSize: FONT_SIZES.sm, color: c.textSecondary, marginBottom: '16px' } },
+        'Drag & drop photos here, or click to browse. Supported: JPG, PNG up to 5MB.'),
+      React.createElement('div', {
+        style: { display: 'inline-block', padding: '8px 16px', background: COLORS.primary[500] + '15', borderRadius: RADIUS.md, fontSize: FONT_SIZES.xs, color: COLORS.primary[500], fontWeight: 600 },
+      }, 'Starter: 4 photos \u2022 Professional: 10 photos \u2022 Elite: 20 photos'),
+    ),
+  );
+
+  // ── Step 5: Review & Submit ──
+  const renderReview = () => {
+    const Section = ({ title, stepIdx, children: ch }) => React.createElement('div', {
+      style: { marginBottom: '20px', padding: '16px', background: c.surfaceAlt || c.surface, borderRadius: RADIUS.lg, border: `1px solid ${c.border}` },
+    },
+      React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' } },
+        React.createElement('h4', { style: { fontSize: FONT_SIZES.base, fontWeight: 700, color: c.text, margin: 0 } }, title),
+        React.createElement('button', {
+          onClick: () => goToStep(stepIdx),
+          style: { background: 'none', border: 'none', color: COLORS.primary[500], cursor: 'pointer', fontSize: FONT_SIZES.sm, fontWeight: 600, fontFamily: FONTS.sans },
+        }, 'Edit'),
+      ),
+      ch,
+    );
+    const Field = ({ label: lbl, value: val }) => val ? React.createElement('div', { style: { marginBottom: '6px' } },
+      React.createElement('span', { style: { fontSize: FONT_SIZES.xs, color: c.textMuted, textTransform: 'uppercase', letterSpacing: '0.5px' } }, lbl + ': '),
+      React.createElement('span', { style: { fontSize: FONT_SIZES.sm, color: c.text } }, Array.isArray(val) ? val.join(', ') : val),
+    ) : null;
+    const catNames = draft.categories.map(cid => { const cat = CATEGORIES.find(ct => ct.id === cid); return cat ? cat.name : cid; });
+    const openDays = Object.entries(dayLabels).filter(([k]) => draft.availability[k] && draft.availability[k].open).map(([k, l]) => l + ' ' + draft.availability[k].start + '-' + draft.availability[k].end);
+    return React.createElement('div', null,
+      React.createElement('h3', { style: { fontSize: FONT_SIZES.xl, fontWeight: 700, marginBottom: '4px', color: c.text } }, 'Review & Submit'),
+      React.createElement('p', { style: { color: c.textSecondary, fontSize: FONT_SIZES.sm, marginBottom: '24px' } }, 'Review your profile details before going live.'),
+      Section({ title: 'Business Details', stepIdx: 0, children: React.createElement('div', null,
+        Field({ label: 'Business Name', value: draft.businessName }),
+        Field({ label: 'ABN', value: draft.abn }),
+        Field({ label: 'Phone', value: draft.phone }),
+        Field({ label: 'Website', value: draft.website }),
+        Field({ label: 'Location', value: [draft.suburb, draft.state, draft.postcode].filter(Boolean).join(', ') }),
+        Field({ label: 'Founded', value: draft.founded }),
+        Field({ label: 'Team Size', value: draft.teamSize }),
+      ) }),
+      Section({ title: 'Services', stepIdx: 1, children: React.createElement('div', null,
+        Field({ label: 'Categories', value: catNames }),
+        Field({ label: 'Service Areas', value: draft.serviceAreas }),
+        Field({ label: 'Plan Types', value: draft.planTypes }),
+        Field({ label: 'Languages', value: draft.languages }),
+      ) }),
+      Section({ title: 'Profile Content', stepIdx: 2, children: React.createElement('div', null,
+        Field({ label: 'Short Description', value: draft.shortDescription }),
+        Field({ label: 'Full Description', value: draft.description }),
+        Field({ label: 'Features', value: draft.features }),
+      ) }),
+      Section({ title: 'Availability', stepIdx: 3, children: React.createElement('div', null,
+        openDays.length ? openDays.map((d, i) => React.createElement('div', { key: i, style: { fontSize: FONT_SIZES.sm, color: c.text, marginBottom: '4px' } }, d))
+          : React.createElement('span', { style: { fontSize: FONT_SIZES.sm, color: c.textMuted, fontStyle: 'italic' } }, 'No availability set'),
+      ) }),
+      Section({ title: 'Photos', stepIdx: 4, children: React.createElement('div', null,
+        React.createElement('span', { style: { fontSize: FONT_SIZES.sm, color: c.textMuted, fontStyle: 'italic' } }, draft.photos.length ? draft.photos.length + ' photos uploaded' : 'No photos added yet'),
+      ) }),
+    );
+  };
+
+  const stepRenderers = [renderBusinessDetails, renderServices, renderProfileContent, renderAvailability, renderPhotos, renderReview];
+
+  return React.createElement('div', {
+    style: { minHeight: '100vh', background: c.bg, padding: responsive.isMobile ? '20px 16px' : '40px 24px' },
+  },
+    React.createElement('div', { style: { maxWidth: '800px', margin: '0 auto' } },
+      // Header
+      React.createElement('div', { style: { textAlign: 'center', marginBottom: '8px' } },
+        React.createElement('h2', {
+          style: { fontSize: responsive.isMobile ? FONT_SIZES['2xl'] : FONT_SIZES['3xl'], fontWeight: 800, color: c.text, fontFamily: FONTS.display, margin: '0 0 4px' },
+        }, 'Set Up Your Profile'),
+        React.createElement('p', { style: { color: c.textSecondary, fontSize: FONT_SIZES.base } },
+          'Step ' + (currentStep + 1) + ' of 6: ' + ONBOARDING_STEPS[currentStep].label),
+      ),
+      // Step indicator
+      React.createElement(WizardStepIndicator, { currentStep, completedSteps, onStepClick: goToStep }),
+      // Step content
+      React.createElement('div', { style: cardStyle }, stepRenderers[currentStep]()),
+      // Navigation
+      React.createElement('div', {
+        style: {
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '24px',
+          maxWidth: '720px', margin: '24px auto 0', flexWrap: 'wrap', gap: '12px',
+        },
+      },
+        React.createElement('div', { style: { display: 'flex', gap: '8px' } },
+          currentStep > 0 && React.createElement('button', { onClick: handleBack, style: btnSecondary }, 'Back'),
+          React.createElement('button', { onClick: handleSaveAndContinue, style: btnGhost }, 'Save & Continue Later'),
+        ),
+        React.createElement('div', { style: { display: 'flex', gap: '8px' } },
+          currentStep === 4 && React.createElement('button', { onClick: handleSkip, style: btnSecondary }, 'Skip'),
+          currentStep < 5 && React.createElement('button', { onClick: handleNext, style: btnPrimary }, 'Next'),
+          currentStep === 5 && React.createElement('button', { onClick: handleComplete, style: { ...btnPrimary, background: COLORS.success } }, 'Complete Setup'),
+        ),
+      ),
+    ),
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
    Phase 5: Directory & Provider Profiles
    ═══════════════════════════════════════════════════════════════ */
 
@@ -2761,8 +3377,8 @@ function ProviderCard({ provider, onView, onFavourite, isFavourite, onCompare, i
   const { theme } = useTheme();
   const { state } = useApp();
   const c = COLORS[theme];
-  const tierColors = { premium: '#F59E0B', professional: COLORS.primary[500], starter: c.textMuted };
-  const tierLabels = { premium: 'Premium', professional: 'Professional', starter: 'Starter' };
+  const tierColors = { elite: '#D97706', premium: '#F59E0B', professional: COLORS.primary[500], starter: c.textMuted };
+  const tierLabels = { elite: 'Elite', premium: 'Premium', professional: 'Professional', starter: 'Starter' };
 
   return React.createElement(Card, {
     hover: true,
@@ -2812,7 +3428,7 @@ function ProviderCard({ provider, onView, onFavourite, isFavourite, onCompare, i
 
     React.createElement('p', { style: { fontSize: FONT_SIZES.sm, color: c.textSecondary, lineHeight: 1.5, marginBottom: '12px',
       display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' } },
-      provider.tier === 'starter' ? provider.shortDescription.slice(0, 200) : provider.shortDescription),
+      provider.tier === 'starter' ? (provider.shortDescription || '').slice(0, 200) : provider.shortDescription),
 
     React.createElement('div', { style: { display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' } },
       provider.categories.slice(0, 3).map(catId => {
@@ -3117,7 +3733,7 @@ function ProviderProfilePage() {
 
   const participant = state.user?.role === 'participant' ? state.participants.find(p => p.id === state.user.id) : null;
   const isFav = participant?.favourites?.includes(provider.id);
-  const tierColors = { premium: '#F59E0B', professional: COLORS.primary[500], starter: c.textMuted };
+  const tierColors = { elite: '#D97706', premium: '#F59E0B', professional: COLORS.primary[500], starter: c.textMuted };
 
   const sendEnquiry = async () => {
     if (!state.user || !enquiryText.trim()) { addToast('Please log in and write a message', 'error'); return; }
@@ -3203,7 +3819,7 @@ function ProviderProfilePage() {
             style: { background: 'none', border: `1px solid ${c.border}`, borderRadius: RADIUS.md, padding: '8px', cursor: 'pointer', color: isFav ? COLORS.error : c.textMuted },
           }, isFav ? Icons.heartFilled(18, COLORS.error) : Icons.heart(18)),
           React.createElement(Button, { variant: 'secondary', size: 'sm', onClick: () => setShowEnquiryModal(true), icon: Icons.mail(16) }, 'Enquire'),
-          provider.tier === 'premium' && React.createElement(Button, { variant: 'primary', size: 'sm', onClick: () => setShowBookingModal(true), icon: Icons.calendar(16) }, 'Book'),
+          (provider.tier === 'premium' || provider.tier === 'elite') && React.createElement(Button, { variant: 'primary', size: 'sm', onClick: () => setShowBookingModal(true), icon: Icons.calendar(16) }, 'Book'),
           React.createElement(Button, { variant: 'ghost', size: 'sm', onClick: () => setShowReportModal(true), icon: Icons.flag(16, COLORS.error), style: { color: COLORS.error } }, 'Report'),
         ),
       ),
@@ -3446,6 +4062,13 @@ function ProviderDashboard() {
   const [provAttachDoc, setProvAttachDoc] = useState(null);
   const [showProvDocPicker, setShowProvDocPicker] = useState(false);
 
+  // Redirect to onboarding wizard if not completed
+  useEffect(() => {
+    if (provider && !provider.onboardingComplete && !state.onboardingWizard.isComplete) {
+      dispatch({ type: ACTION_TYPES.NAV_GOTO, payload: { route: 'provider-onboarding' } });
+    }
+  }, [provider?.id]);
+
   if (!provider) return React.createElement(EmptyState, { title: 'Provider not found' });
 
   const myReviews = state.reviews.filter(r => r.providerId === provider.id);
@@ -3557,12 +4180,13 @@ function ProviderDashboard() {
 
   // ── Analytics Tab ──
   if (tab === 'analytics') {
-    if (provider.tier === 'starter') return React.createElement('div', { style: { padding: '24px 32px' } },
-      React.createElement(EmptyState, {
-        icon: Icons.barChart(48, c.textMuted), title: 'Analytics Locked',
-        description: 'Upgrade to Professional or Premium to access analytics.',
-        action: React.createElement(Button, { variant: 'primary', onClick: () => dispatch({type:ACTION_TYPES.SET_DASHBOARD_TAB,payload:'subscription'}) }, 'Upgrade Now'),
-      }),
+    if (!canAccessFeature(provider.tier, 'analytics')) return React.createElement('div', { style: { padding: '24px 32px' } },
+      React.createElement(LockedFeature, { tier: provider.tier, feature: 'analytics' },
+        React.createElement(EmptyState, {
+          icon: Icons.barChart(48, c.textMuted), title: 'Analytics Dashboard',
+          description: 'View detailed insights about your profile performance.',
+        }),
+      ),
     );
 
     return React.createElement('div', { style: { padding: responsive.isMobile ? '20px 16px' : '24px 32px' } },
@@ -3851,7 +4475,7 @@ function ProviderDashboard() {
           React.createElement('p', { style: { fontSize: FONT_SIZES.xs, fontWeight: 600, color: COLORS.primary[500], marginBottom: '4px' } }, 'Your Response'),
           React.createElement('p', { style: { fontSize: FONT_SIZES.sm, color: c.textSecondary } }, r.response),
         ) :
-        (provider.tier !== 'starter' && (replyingTo === r.id ?
+        (canAccessFeature(provider.tier, 'reviewResponse') && (replyingTo === r.id ?
           React.createElement('div', { style: { marginTop: '12px', display: 'flex', gap: '8px' } },
             React.createElement('input', { value: responseText, onChange: e => setResponseText(e.target.value), placeholder: 'Write a response...', style: { flex: 1, padding: '8px 12px', background: c.surfaceAlt, border: `1px solid ${c.border}`, borderRadius: RADIUS.md, color: c.text, outline: 'none', fontFamily: FONTS.sans, fontSize: FONT_SIZES.sm } }),
             React.createElement(Button, { variant: 'primary', size: 'sm', onClick: () => {
@@ -4066,7 +4690,8 @@ function ParticipantDashboard() {
               const catOverlap = (p.categories || []).filter(cat => cats.includes(cat)).length;
               score += catOverlap * 20;
               score += p.rating * 5;
-              if (p.tier === 'premium') score += 15;
+              if (p.tier === 'elite') score += 20;
+              else if (p.tier === 'premium') score += 15;
               else if (p.tier === 'professional') score += 8;
               if (p.verified) score += 10;
               return { ...p, _score: score };
@@ -4493,10 +5118,11 @@ function AdminDashboard() {
 
   const totalProviders = state.providers.length;
   const totalParticipants = state.participants.length;
+  const eliteCount = state.providers.filter(p => p.tier === 'elite').length;
   const premiumCount = state.providers.filter(p => p.tier === 'premium').length;
   const proCount = state.providers.filter(p => p.tier === 'professional').length;
   const freeCount = state.providers.filter(p => p.tier === 'starter').length;
-  const mrr = premiumCount * 149 + proCount * 49;
+  const mrr = eliteCount * 349 + premiumCount * 149 + proCount * 49;
 
   const revenueData = ANALYTICS_MONTHS.map((m, i) => ({
     month: m,
@@ -4506,6 +5132,7 @@ function AdminDashboard() {
   }));
 
   const subData = [
+    { name: 'Elite', value: eliteCount, color: '#D97706' },
     { name: 'Premium', value: premiumCount, color: '#F59E0B' },
     { name: 'Professional', value: proCount, color: COLORS.primary[500] },
     { name: 'Starter', value: freeCount, color: COLORS.accent[500] },
@@ -4519,7 +5146,7 @@ function AdminDashboard() {
       React.createElement(StatCard, { icon: Icons.briefcase(20, COLORS.primary[500]), label: 'Total Providers', value: totalProviders, change: 12, trend: 'up' }),
       React.createElement(StatCard, { icon: Icons.users(20, COLORS.accent[500]), label: 'Total Participants', value: totalParticipants, change: 18, trend: 'up' }),
       React.createElement(StatCard, { icon: Icons.dollarSign(20, COLORS.success), label: 'Monthly Revenue', value: `$${mrr.toLocaleString()}`, change: 15, trend: 'up' }),
-      React.createElement(StatCard, { icon: Icons.trendingUp(20, COLORS.primary[400]), label: 'Active Subs', value: premiumCount + proCount, change: 8, trend: 'up' }),
+      React.createElement(StatCard, { icon: Icons.trendingUp(20, COLORS.primary[400]), label: 'Active Subs', value: eliteCount + premiumCount + proCount, change: 8, trend: 'up' }),
     ),
 
     React.createElement('div', { style: { display: 'grid', gridTemplateColumns: responsive.isMobile ? '1fr' : 'repeat(2, 1fr)', gap: '24px' } },
@@ -4664,7 +5291,8 @@ function AdminDashboard() {
   // ── Providers Management ──
   if (tab === 'providers-mgmt') return React.createElement('div', { style: { padding: responsive.isMobile ? '20px 16px' : '24px 32px' } },
     React.createElement('h2', { style: { fontSize: FONT_SIZES['2xl'], fontWeight: 800, color: c.text, marginBottom: '24px' } }, 'Provider Management'),
-    React.createElement('div', { style: { display: 'grid', gridTemplateColumns: responsive.isMobile ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)', gap: '16px', marginBottom: '24px' } },
+    React.createElement('div', { style: { display: 'grid', gridTemplateColumns: responsive.isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' } },
+      React.createElement(StatCard, { label: 'Elite', value: eliteCount, icon: Icons.crown(20, '#D97706') }),
       React.createElement(StatCard, { label: 'Premium', value: premiumCount, icon: Icons.crown(20, '#F59E0B') }),
       React.createElement(StatCard, { label: 'Professional', value: proCount, icon: Icons.award(20, COLORS.primary[500]) }),
       React.createElement(StatCard, { label: 'Starter', value: freeCount, icon: Icons.user(20, c.textMuted) }),
@@ -4701,7 +5329,7 @@ function AdminDashboard() {
     React.createElement('div', { style: { display: 'grid', gridTemplateColumns: responsive.isMobile ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)', gap: '16px', marginBottom: '24px' } },
       React.createElement(StatCard, { icon: Icons.dollarSign(20, COLORS.success), label: 'MRR', value: `$${mrr.toLocaleString()}` }),
       React.createElement(StatCard, { icon: Icons.trendingUp(20, COLORS.primary[500]), label: 'ARR', value: `$${(mrr*12).toLocaleString()}` }),
-      React.createElement(StatCard, { icon: Icons.creditCard(20, COLORS.accent[500]), label: 'Avg Revenue/Provider', value: `$${Math.round(mrr / Math.max(premiumCount+proCount, 1))}` }),
+      React.createElement(StatCard, { icon: Icons.creditCard(20, COLORS.accent[500]), label: 'Avg Revenue/Provider', value: `$${Math.round(mrr / Math.max(eliteCount+premiumCount+proCount, 1))}` }),
     ),
     React.createElement(Card, null,
       React.createElement('h3', { style: { fontSize: FONT_SIZES.base, fontWeight: 700, color: c.text, marginBottom: '16px' } }, 'Revenue Over Time'),
@@ -5121,6 +5749,7 @@ function AppRouter() {
     case 'directory': return React.createElement(DirectoryPage);
     case 'provider-profile': return React.createElement(ProviderProfilePage);
     case 'provider-dashboard': return React.createElement(ProviderDashboard);
+    case 'provider-onboarding': return React.createElement(ProviderOnboardingWizard);
     case 'participant-dashboard': return React.createElement(ParticipantDashboard);
     case 'admin-dashboard': return React.createElement(AdminDashboard);
     case 'help': return React.createElement(InfoPage, { pageKey: 'help' });
