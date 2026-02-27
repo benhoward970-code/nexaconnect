@@ -63,6 +63,46 @@ export async function redirectToCheckout({ providerId, priceId, planName, billin
 }
 
 /**
+ * Redirect to Stripe Checkout to unlock a lead (one-time $25 payment).
+ * Calls the Supabase Edge Function `unlock-lead`.
+ */
+export async function redirectToLeadUnlock({ providerId, leadId }) {
+  if (!isSupabaseConfigured()) {
+    throw new Error('Supabase not configured');
+  }
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('Not authenticated');
+
+  const { data, error } = await supabase.functions.invoke('unlock-lead', {
+    body: {
+      providerId,
+      leadId,
+      returnUrl: window.location.origin,
+    },
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+    },
+  });
+
+  if (error) {
+    let msg = error.message || 'Unknown error';
+    if (error.context && typeof error.context.json === 'function') {
+      try { const body = await error.context.json(); msg = body.error || msg; } catch (_) {}
+    }
+    throw new Error(msg);
+  }
+  if (data?.error) {
+    throw new Error(data.error);
+  }
+  if (data?.url) {
+    window.location.href = data.url;
+  } else {
+    throw new Error('No checkout URL returned');
+  }
+}
+
+/**
  * Open Stripe Billing Portal for subscription management.
  * Calls the Supabase Edge Function `create-portal`.
  */

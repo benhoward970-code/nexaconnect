@@ -71,20 +71,91 @@ serve(async (req) => {
     function getTierFromPlan(planName?: string): string {
       if (!planName) return "starter";
       const lower = planName.toLowerCase();
+      if (lower.includes("elite")) return "elite";
       if (lower.includes("premium")) return "premium";
       if (lower.includes("professional") || lower.includes("pro")) return "professional";
       return "starter";
     }
 
+    // Helper to send email via send-email edge function
+    async function sendEmail(to: string, subject: string, html: string) {
+      try {
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+        await fetch(`${supabaseUrl}/functions/v1/send-email`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${serviceKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ to, subject, html }),
+        });
+      } catch (emailErr) {
+        console.error("Failed to send email:", emailErr);
+      }
+    }
+
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
+        const metadataType = session.metadata?.type;
+
+        // ── Lead Unlock Payment ──
+        if (metadataType === "lead_unlock") {
+          const leadId = session.metadata?.leadId;
+          const providerId = session.metadata?.providerId;
+
+          if (leadId) {
+            // Update lead status to unlocked
+            await supabase.from("leads").update({
+              status: "unlocked",
+              payment_intent_id: session.payment_intent as string,
+            }).eq("id", leadId);
+
+            // Get lead details for notification
+            const { data: lead } = await supabase.from("leads").select("*, provider:providers(name)").eq("id", leadId).single();
+            const { data: participant } = lead?.participant_id
+              ? await supabase.from("participants").select("user_id, email, name").eq("id", lead.participant_id).single()
+              : { data: null };
+
+            // Write notification to participant
+            if (participant?.user_id) {
+              const providerName = (lead as any)?.provider?.name || "A provider";
+              await supabase.from("notifications").insert({
+                user_id: participant.user_id,
+                type: "lead",
+                title: "A provider has accepted your request",
+                body: `${providerName} has unlocked your support request and will be in touch soon.`,
+                link: "leads",
+              });
+
+              // Send email to participant
+              if (participant.email) {
+                await sendEmail(
+                  participant.email,
+                  `${providerName} has accepted your support request — NexaConnect`,
+                  `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;">
+                    <h2 style="color:#2563EB;">Good news!</h2>
+                    <p><strong>${providerName}</strong> has accepted your support request and will be in touch shortly.</p>
+                    <p>They now have access to your contact details so you can expect to hear from them soon.</p>
+                    <p style="margin-top:24px;color:#64748B;font-size:14px;">— The NexaConnect Team</p>
+                  </div>`
+                );
+              }
+            }
+
+            console.log(`Lead ${leadId} unlocked by provider ${providerId}`);
+          }
+          break;
+        }
+
+        // ── Subscription Payment ──
         const providerId = session.metadata?.providerId;
         const planName = session.metadata?.planName;
 
         if (providerId && session.subscription) {
           const tier = getTierFromPlan(planName);
-          const verified = tier === "premium";
+          const verified = tier === "premium" || tier === "elite";
 
           // Update tier on providers table
           await supabase.from("providers").update({
@@ -113,7 +184,7 @@ serve(async (req) => {
             const tier = getTierFromPlan(planName);
             await supabase.from("providers").update({
               tier,
-              verified: tier === "premium",
+              verified: tier === "premium" || tier === "elite",
             }).eq("id", providerId);
           }
         }

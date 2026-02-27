@@ -353,6 +353,90 @@ export async function updateBooking(id, updates) {
   return snakeToBooking(data);
 }
 
+// ── Leads ──
+
+function snakeToLead(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    providerId: row.provider_id,
+    participantId: row.participant_id,
+    participantName: row.participant_name || '',
+    participantEmail: row.participant_email || '',
+    participantPhone: row.participant_phone || '',
+    participantSuburb: row.participant_suburb || '',
+    category: row.category || '',
+    supportNeeds: row.support_needs || '',
+    planType: row.plan_type || '',
+    status: row.status || 'new',
+    unlockPrice: row.unlock_price || 2500,
+    paymentIntentId: row.payment_intent_id,
+    createdAt: row.created_at,
+  };
+}
+
+export async function fetchLeads(providerId) {
+  if (!isSupabaseConfigured()) return null;
+  const { data, error } = await supabase.from('leads').select('*').eq('provider_id', providerId).order('created_at', { ascending: false });
+  if (error) { console.error('fetchLeads:', error); return null; }
+  return data.map(snakeToLead);
+}
+
+export async function submitLead(leadData) {
+  if (!isSupabaseConfigured()) return null;
+  const row = {
+    provider_id: leadData.providerId,
+    participant_id: leadData.participantId,
+    participant_name: leadData.participantName,
+    participant_email: leadData.participantEmail,
+    participant_phone: leadData.participantPhone,
+    participant_suburb: leadData.participantSuburb,
+    category: leadData.category,
+    support_needs: leadData.supportNeeds,
+    plan_type: leadData.planType,
+  };
+  const { data, error } = await supabase.from('leads').insert(row).select().single();
+  if (error) { console.error('submitLead:', error); return null; }
+  return snakeToLead(data);
+}
+
+export async function declineLead(leadId) {
+  if (!isSupabaseConfigured()) return null;
+  const { error } = await supabase.from('leads').update({ status: 'declined' }).eq('id', leadId);
+  if (error) { console.error('declineLead:', error); return null; }
+  return true;
+}
+
+// ── Notifications ──
+
+function snakeToNotification(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    userId: row.user_id,
+    type: row.type || 'general',
+    title: row.title || '',
+    body: row.body || '',
+    link: row.link || '',
+    read: row.read || false,
+    createdAt: row.created_at,
+  };
+}
+
+export async function fetchNotifications(userId) {
+  if (!isSupabaseConfigured()) return null;
+  const { data, error } = await supabase.from('notifications').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(50);
+  if (error) { console.error('fetchNotifications:', error); return null; }
+  return data.map(snakeToNotification);
+}
+
+export async function markNotificationRead(notifId) {
+  if (!isSupabaseConfigured()) return null;
+  const { error } = await supabase.from('notifications').update({ read: true }).eq('id', notifId);
+  if (error) { console.error('markNotificationRead:', error); return null; }
+  return true;
+}
+
 // ── Stripe helpers ──
 
 export async function updateProviderStripe(providerId, stripeData) {

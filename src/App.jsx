@@ -8,7 +8,7 @@ import { LineChart, Line, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
         XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { supabase, isSupabaseConfigured } from './supabase';
 import * as db from './db.js';
-import { isStripeConfigured, redirectToCheckout, openBillingPortal } from './stripe.js';
+import { isStripeConfigured, redirectToCheckout, redirectToLeadUnlock, openBillingPortal } from './stripe.js';
 
 /* ─── Phase 1: Foundation ─────────────────────────────────────── */
 
@@ -1307,6 +1307,8 @@ const FEATURE_MIN_TIER = {
   analytics: 'professional',
   reviewResponse: 'professional',
   additionalPhotos: 'professional',
+  leadUnlock: 'professional',
+  aiAssistant: 'professional',
   directBooking: 'premium',
   verifiedBadge: 'premium',
   featuredSpot: 'elite',
@@ -1531,6 +1533,12 @@ const ACTION_TYPES = {
   SET_ONBOARDING_COMPLETED: 'SET_ONBOARDING_COMPLETED',
   LOAD_ONBOARDING_DRAFT: 'LOAD_ONBOARDING_DRAFT',
   CLEAR_ONBOARDING_DRAFT: 'CLEAR_ONBOARDING_DRAFT',
+  // Phase 3: Lead Connection
+  SUBMIT_LEAD: 'SUBMIT_LEAD',
+  UNLOCK_LEAD: 'UNLOCK_LEAD',
+  DECLINE_LEAD: 'DECLINE_LEAD',
+  SET_DB_LEADS: 'SET_DB_LEADS',
+  SET_DB_NOTIFICATIONS: 'SET_DB_NOTIFICATIONS',
 };
 
 function getInitialState() {
@@ -1564,6 +1572,7 @@ function getInitialState() {
     loading: true,
     compareProviders: [],
     reports: [],
+    leads: [],
     notifications: NOTIFICATIONS_DATA,
     onboardingWizard: (() => {
       let ob = { currentStep: 0, completedSteps: [], draft: {
@@ -1744,6 +1753,18 @@ function appReducer(state, action) {
       return { ...state, enquiries: [...ENQUIRIES_DATA, ...action.payload.filter(dbe => !ENQUIRIES_DATA.some(me => me.id === dbe.id))] };
     case ACTION_TYPES.SET_DB_BOOKINGS:
       return { ...state, bookings: [...BOOKINGS_DATA, ...action.payload.filter(dbb => !BOOKINGS_DATA.some(mb => mb.id === dbb.id))] };
+    case ACTION_TYPES.SUBMIT_LEAD: {
+      const newLead = { id: 'lead_' + Date.now(), ...action.payload, status: 'new', unlockPrice: 2500, createdAt: new Date().toISOString() };
+      return { ...state, leads: [newLead, ...state.leads] };
+    }
+    case ACTION_TYPES.UNLOCK_LEAD:
+      return { ...state, leads: state.leads.map(l => l.id === action.payload ? { ...l, status: 'unlocked' } : l) };
+    case ACTION_TYPES.DECLINE_LEAD:
+      return { ...state, leads: state.leads.map(l => l.id === action.payload ? { ...l, status: 'declined' } : l) };
+    case ACTION_TYPES.SET_DB_LEADS:
+      return { ...state, leads: action.payload };
+    case ACTION_TYPES.SET_DB_NOTIFICATIONS:
+      return { ...state, notifications: [...NOTIFICATIONS_DATA, ...action.payload.filter(dbn => !NOTIFICATIONS_DATA.some(mn => mn.id === dbn.id))] };
     default:
       return state;
   }
@@ -2040,6 +2061,7 @@ function Sidebar() {
 
   const providerNav = [
     { key:'overview',label:'Overview',icon:Icons.home },
+    { key:'leads',label:'Leads',icon:Icons.users },
     { key:'analytics',label:'Analytics',icon:Icons.barChart },
     { key:'profile-edit',label:'Edit Profile',icon:Icons.edit },
     { key:'inbox',label:'Inbox',icon:Icons.mail },
@@ -3722,6 +3744,8 @@ function ProviderProfilePage() {
   const [activeTab, setActiveTab] = useState('about');
   const [enquiryText, setEnquiryText] = useState('');
   const [showEnquiryModal, setShowEnquiryModal] = useState(false);
+  const [showLeadForm, setShowLeadForm] = useState(false);
+  const [leadFormData, setLeadFormData] = useState({ category: '', supportNeeds: '', planType: 'Plan Managed' });
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [bookingData, setBookingData] = useState({ service: '', date: '', time: '', notes: '' });
   const [reviewData, setReviewData] = useState({ rating: 5, text: '' });
@@ -3818,7 +3842,8 @@ function ProviderProfilePage() {
             onClick: () => dispatch({type:ACTION_TYPES.TOGGLE_FAVOURITE,payload:provider.id}),
             style: { background: 'none', border: `1px solid ${c.border}`, borderRadius: RADIUS.md, padding: '8px', cursor: 'pointer', color: isFav ? COLORS.error : c.textMuted },
           }, isFav ? Icons.heartFilled(18, COLORS.error) : Icons.heart(18)),
-          React.createElement(Button, { variant: 'secondary', size: 'sm', onClick: () => setShowEnquiryModal(true), icon: Icons.mail(16) }, 'Enquire'),
+          React.createElement(Button, { variant: 'secondary', size: 'sm', onClick: () => setShowLeadForm(true), icon: Icons.users(16) }, 'Connect'),
+          React.createElement(Button, { variant: 'ghost', size: 'sm', onClick: () => setShowEnquiryModal(true), icon: Icons.mail(16) }, 'Enquire'),
           (provider.tier === 'premium' || provider.tier === 'elite') && React.createElement(Button, { variant: 'primary', size: 'sm', onClick: () => setShowBookingModal(true), icon: Icons.calendar(16) }, 'Book'),
           React.createElement(Button, { variant: 'ghost', size: 'sm', onClick: () => setShowReportModal(true), icon: Icons.flag(16, COLORS.error), style: { color: COLORS.error } }, 'Report'),
         ),
@@ -3979,6 +4004,52 @@ function ProviderProfilePage() {
       ),
     ),
 
+    // Lead Form Modal
+    React.createElement(Modal, { open: showLeadForm, onClose: () => setShowLeadForm(false), title: 'Request Support' },
+      !state.user ? React.createElement('div', null,
+        React.createElement('p', { style: { color: c.textSecondary, marginBottom: '16px' } }, 'Please log in to submit a support request.'),
+        React.createElement(Button, { variant: 'primary', onClick: () => { setShowLeadForm(false); dispatch({type:ACTION_TYPES.NAV_GOTO,payload:{route:'login'}}); } }, 'Log In'),
+      ) :
+      React.createElement('div', null,
+        React.createElement('p', { style: { color: c.textSecondary, marginBottom: '16px', lineHeight: 1.6 } },
+          `Submit a support request to ${provider.name}. They will be able to see your category, suburb, and support needs. Your contact details will only be shared if the provider chooses to unlock your request.`),
+        React.createElement(Select, {
+          label: 'Support Category',
+          value: leadFormData.category,
+          onChange: v => setLeadFormData(p => ({...p, category: v})),
+          options: [{value:'',label:'Select a category...'}, ...provider.categories.map(cId => { const ct = CATEGORIES.find(x=>x.id===cId); return ct ? {value:ct.name,label:ct.name} : null; }).filter(Boolean)],
+        }),
+        React.createElement(Input, { textarea: true, label: 'Describe your support needs', value: leadFormData.supportNeeds, onChange: v => setLeadFormData(p => ({...p, supportNeeds: v})), placeholder: 'What type of support are you looking for? Include any relevant details about your goals, schedule preferences, or specific requirements...' }),
+        React.createElement(Select, {
+          label: 'NDIS Plan Type',
+          value: leadFormData.planType,
+          onChange: v => setLeadFormData(p => ({...p, planType: v})),
+          options: [{value:'Agency Managed',label:'Agency Managed'},{value:'Plan Managed',label:'Plan Managed'},{value:'Self Managed',label:'Self Managed'}],
+        }),
+        React.createElement(Button, {
+          variant: 'primary', fullWidth: true,
+          onClick: async () => {
+            if (!leadFormData.category) { addToast('Please select a category', 'error'); return; }
+            if (!leadFormData.supportNeeds.trim()) { addToast('Please describe your support needs', 'error'); return; }
+            const part = state.participants.find(p => p.id === state.user.id || p.userId === state.user.id);
+            const leadPayload = {
+              providerId: provider.id, participantId: part?.id || state.user.id,
+              participantName: state.user.name, participantEmail: state.user.email || part?.email || '',
+              participantPhone: part?.phone || '', participantSuburb: part?.suburb || '',
+              category: leadFormData.category, supportNeeds: leadFormData.supportNeeds, planType: leadFormData.planType,
+            };
+            dispatch({ type: ACTION_TYPES.SUBMIT_LEAD, payload: leadPayload });
+            db.submitLead(leadPayload);
+            // Notify provider
+            dispatch({ type: ACTION_TYPES.ADD_NOTIFICATION, payload: { userId: provider.userId || provider.user_id, type: 'lead', title: 'New support request', body: `New ${leadFormData.category} request from ${state.user.name}`, link: 'leads' } });
+            setLeadFormData({ category: '', supportNeeds: '', planType: 'Plan Managed' });
+            setShowLeadForm(false);
+            addToast('Support request submitted! The provider will review it soon.', 'success');
+          },
+        }, 'Submit Request'),
+      ),
+    ),
+
     // Booking Modal
     React.createElement(Modal, { open: showBookingModal, onClose: () => setShowBookingModal(false), title: 'Book Appointment' },
       !state.user ? React.createElement('div', null,
@@ -4061,6 +4132,8 @@ function ProviderDashboard() {
   const [responseText, setResponseText] = useState('');
   const [provAttachDoc, setProvAttachDoc] = useState(null);
   const [showProvDocPicker, setShowProvDocPicker] = useState(false);
+  const [leadFilter, setLeadFilter] = useState('all');
+  const [showUnlockModal, setShowUnlockModal] = useState(null);
 
   // Redirect to onboarding wizard if not completed
   useEffect(() => {
@@ -4082,9 +4155,10 @@ function ProviderDashboard() {
     React.createElement('p', { style: { color: c.textSecondary, marginBottom: '24px' } }, 'Here is an overview of your account.'),
 
     // Quick Stats
-    React.createElement('div', { style: { display: 'grid', gridTemplateColumns: responsive.isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' } },
+    React.createElement('div', { style: { display: 'grid', gridTemplateColumns: responsive.isMobile ? 'repeat(2, 1fr)' : 'repeat(5, 1fr)', gap: '16px', marginBottom: '24px' } },
       React.createElement(StatCard, { icon: Icons.eye(20, COLORS.primary[500]), label: 'Profile Views', value: provider.viewsThisMonth, change: 12, trend: 'up' }),
-      React.createElement(StatCard, { icon: Icons.mail(20, COLORS.accent[500]), label: 'Enquiries', value: provider.enquiriesThisMonth, change: 8, trend: 'up' }),
+      React.createElement(StatCard, { icon: Icons.users(20, COLORS.accent[500]), label: 'New Leads', value: state.leads.filter(l => l.providerId === provider.id && l.status === 'new').length, onClick: () => dispatch({type:ACTION_TYPES.SET_DASHBOARD_TAB,payload:'leads'}) }),
+      React.createElement(StatCard, { icon: Icons.mail(20, COLORS.accent[400]), label: 'Enquiries', value: provider.enquiriesThisMonth, change: 8, trend: 'up' }),
       React.createElement(StatCard, { icon: Icons.calendar(20, COLORS.success), label: 'Bookings', value: provider.bookingsThisMonth, change: 15, trend: 'up' }),
       React.createElement(StatCard, { icon: Icons.star(20, COLORS.star), label: 'Rating', value: provider.rating.toFixed(1), change: 2, trend: 'up' }),
     ),
@@ -4488,6 +4562,111 @@ function ProviderDashboard() {
           React.createElement(Button, { variant: 'ghost', size: 'sm', onClick: () => setReplyingTo(r.id), style: { marginTop: '8px' } }, 'Respond')
         )),
       )),
+    );
+  }
+
+  // ── Leads Tab ──
+  if (tab === 'leads') {
+    const myLeads = state.leads.filter(l => l.providerId === provider.id);
+    const filteredLeads = leadFilter === 'all' ? myLeads : myLeads.filter(l => l.status === leadFilter);
+
+    const handleUnlockLead = async (lead) => {
+      if (!canAccessFeature(provider.tier, 'leadUnlock')) {
+        addToast('Upgrade to Professional to unlock leads', 'warning');
+        dispatch({type:ACTION_TYPES.NAV_GOTO,payload:{route:'pricing'}});
+        return;
+      }
+      setShowUnlockModal(null);
+      try {
+        await redirectToLeadUnlock({ providerId: provider.id, leadId: lead.id });
+      } catch (err) {
+        addToast(err.message || 'Failed to start checkout', 'error');
+      }
+    };
+
+    const handleDeclineLead = async (lead) => {
+      dispatch({ type: ACTION_TYPES.DECLINE_LEAD, payload: lead.id });
+      db.declineLead(lead.id);
+      addToast('Lead declined', 'info');
+    };
+
+    return React.createElement('div', { style: { padding: responsive.isMobile ? '20px 16px' : '24px 32px' } },
+      React.createElement('h2', { style: { fontSize: FONT_SIZES['2xl'], fontWeight: 800, color: c.text, marginBottom: '8px' } }, 'Leads'),
+      React.createElement('p', { style: { color: c.textSecondary, marginBottom: '24px' } }, 'Participants looking for your services. Unlock a lead for $25 to view full contact details.'),
+
+      // Filter bar
+      React.createElement('div', { style: { display: 'flex', gap: '8px', marginBottom: '24px', flexWrap: 'wrap' } },
+        ['all', 'new', 'unlocked', 'declined'].map(f =>
+          React.createElement('button', {
+            key: f, onClick: () => setLeadFilter(f),
+            style: {
+              padding: '8px 16px', borderRadius: RADIUS.full, border: `1px solid ${leadFilter === f ? COLORS.primary[500] : c.border}`,
+              background: leadFilter === f ? `${COLORS.primary[500]}15` : 'transparent', color: leadFilter === f ? COLORS.primary[500] : c.textSecondary,
+              cursor: 'pointer', fontFamily: FONTS.sans, fontSize: FONT_SIZES.sm, fontWeight: 600, transition: 'all 0.2s',
+            },
+          }, f.charAt(0).toUpperCase() + f.slice(1) + (f === 'all' ? ` (${myLeads.length})` : ` (${myLeads.filter(l => f === 'all' || l.status === f).length})`)),
+        ),
+      ),
+
+      // Lead cards
+      filteredLeads.length === 0 ? React.createElement(EmptyState, { title: 'No leads yet', description: leadFilter !== 'all' ? 'No leads match this filter.' : 'When participants submit support requests for your services, they will appear here.' }) :
+      filteredLeads.map(lead => React.createElement(Card, { key: lead.id, style: { marginBottom: '16px', position: 'relative' } },
+        React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', flexWrap: 'wrap' } },
+          React.createElement('div', { style: { flex: 1, minWidth: '200px' } },
+            // Category + suburb (always visible)
+            React.createElement('div', { style: { display: 'flex', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' } },
+              lead.category && React.createElement(Badge, { variant: 'info', size: 'xs' }, lead.category),
+              lead.participantSuburb && React.createElement(Badge, { size: 'xs' }, Icons.mapPin(12), ' ', lead.participantSuburb),
+              lead.planType && React.createElement(Badge, { variant: 'success', size: 'xs' }, lead.planType),
+              React.createElement(Badge, { variant: lead.status === 'new' ? 'warning' : lead.status === 'unlocked' ? 'success' : 'default', size: 'xs' }, lead.status.charAt(0).toUpperCase() + lead.status.slice(1)),
+            ),
+
+            // Participant name + contact (blurred when new)
+            React.createElement('div', { style: { marginBottom: '8px', ...(lead.status === 'new' ? { filter: 'blur(4px)', userSelect: 'none', pointerEvents: 'none' } : {}) } },
+              React.createElement('p', { style: { fontSize: FONT_SIZES.base, fontWeight: 700, color: c.text, marginBottom: '4px' } }, lead.participantName || 'Participant'),
+              React.createElement('div', { style: { display: 'flex', gap: '16px', flexWrap: 'wrap' } },
+                lead.participantEmail && React.createElement('span', { style: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: FONT_SIZES.sm, color: c.textSecondary } }, Icons.mail(14), lead.participantEmail),
+                lead.participantPhone && React.createElement('span', { style: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: FONT_SIZES.sm, color: c.textSecondary } }, Icons.phone(14), lead.participantPhone),
+              ),
+            ),
+
+            // Support needs
+            lead.supportNeeds && React.createElement('p', { style: { fontSize: FONT_SIZES.sm, color: c.textSecondary, lineHeight: 1.6, marginTop: '8px', ...(lead.status === 'new' ? { maxHeight: '3em', overflow: 'hidden' } : {}) } }, lead.supportNeeds),
+
+            // Timestamp
+            React.createElement('p', { style: { fontSize: FONT_SIZES.xs, color: c.textMuted, marginTop: '8px' } }, lead.createdAt ? new Date(lead.createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : ''),
+          ),
+
+          // Action buttons
+          React.createElement('div', { style: { display: 'flex', gap: '8px', flexShrink: 0 } },
+            lead.status === 'new' && React.createElement(Fragment, null,
+              canAccessFeature(provider.tier, 'leadUnlock')
+                ? React.createElement(Button, { variant: 'primary', size: 'sm', onClick: () => setShowUnlockModal(lead), icon: Icons.dollarSign(16) }, 'Unlock \u2014 $25.00')
+                : React.createElement(Button, { variant: 'secondary', size: 'sm', onClick: () => dispatch({type:ACTION_TYPES.NAV_GOTO,payload:{route:'pricing'}}), icon: Icons.lock(16) }, 'Upgrade to Unlock'),
+              React.createElement(Button, { variant: 'ghost', size: 'sm', onClick: () => handleDeclineLead(lead) }, 'Decline'),
+            ),
+            lead.status === 'unlocked' && React.createElement(Badge, { variant: 'success' }, Icons.check(14), ' Unlocked'),
+            lead.status === 'declined' && React.createElement(Badge, { variant: 'default' }, 'Declined'),
+          ),
+        ),
+      )),
+
+      // Unlock confirmation modal
+      React.createElement(Modal, { open: !!showUnlockModal, onClose: () => setShowUnlockModal(null), title: 'Unlock Lead' },
+        showUnlockModal && React.createElement('div', null,
+          React.createElement('p', { style: { color: c.textSecondary, marginBottom: '16px', lineHeight: 1.6 } },
+            'You are about to pay a one-time fee of ', React.createElement('strong', null, '$25.00'), ' to unlock full contact details for this support request.'),
+          React.createElement('div', { style: { padding: '16px', borderRadius: RADIUS.md, background: c.surfaceAlt, marginBottom: '16px' } },
+            React.createElement('p', { style: { fontSize: FONT_SIZES.sm, fontWeight: 600, color: c.text, marginBottom: '4px' } }, 'Category: ', showUnlockModal.category),
+            showUnlockModal.participantSuburb && React.createElement('p', { style: { fontSize: FONT_SIZES.sm, color: c.textSecondary } }, 'Suburb: ', showUnlockModal.participantSuburb),
+            showUnlockModal.planType && React.createElement('p', { style: { fontSize: FONT_SIZES.sm, color: c.textSecondary } }, 'Plan Type: ', showUnlockModal.planType),
+          ),
+          React.createElement('div', { style: { display: 'flex', gap: '8px' } },
+            React.createElement(Button, { variant: 'primary', onClick: () => handleUnlockLead(showUnlockModal), fullWidth: true }, 'Pay $25.00 & Unlock'),
+            React.createElement(Button, { variant: 'ghost', onClick: () => setShowUnlockModal(null) }, 'Cancel'),
+          ),
+        ),
+      ),
     );
   }
 
@@ -5737,6 +5916,160 @@ function ComplaintsPage() {
    Phase 9: Root App Assembly
    ═══════════════════════════════════════════════════════════════ */
 
+// ── Provider AI Assistant Chatbot ──
+function AIChatbot() {
+  const { theme } = useTheme();
+  const { state } = useApp();
+  const responsive = useResponsive();
+  const c = COLORS[theme];
+  const [isOpen, setIsOpen] = useState(false);
+  const [messages, setMessages] = useState([{ role: 'assistant', text: "Hi! I'm your NexaConnect Assistant. Ask me anything about managing your profile, responding to leads, or growing your NDIS business." }]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const messagesEndRef = useRef(null);
+
+  const provider = state.providers.find(p => p.email === state.user?.email);
+  const shouldShow = state.user && state.user.role === 'provider' && provider && state.route === 'provider-dashboard';
+
+  const scrollToBottom = () => {
+    if (messagesEndRef.current) messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const sendMessage = async () => {
+    if (!input.trim() || loading) return;
+    const userMsg = input.trim();
+    setInput('');
+    setMessages(prev => [...prev, { role: 'user', text: userMsg }]);
+    setLoading(true);
+
+    try {
+      if (!canAccessFeature(provider.tier, 'aiAssistant')) {
+        setMessages(prev => [...prev, { role: 'assistant', text: 'The AI Assistant is available on Professional tier and above. Upgrade your plan to unlock this feature!' }]);
+        setLoading(false);
+        return;
+      }
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const { data, error } = await supabase.functions.invoke('ai-assistant', {
+        body: { message: userMsg, providerId: provider.id },
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+
+      if (error) throw error;
+      setMessages(prev => [...prev, { role: 'assistant', text: data?.reply || 'Sorry, I could not generate a response.' }]);
+    } catch (err) {
+      setMessages(prev => [...prev, { role: 'assistant', text: 'Sorry, something went wrong. Please try again.' }]);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => { if (shouldShow) scrollToBottom(); }, [messages]);
+
+  if (!shouldShow) return null;
+
+  // Floating chat bubble
+  if (!isOpen) {
+    return React.createElement('button', {
+      onClick: () => setIsOpen(true),
+      style: {
+        position: 'fixed', bottom: responsive.isMobile ? '16px' : '24px', right: responsive.isMobile ? '16px' : '24px',
+        width: '56px', height: '56px', borderRadius: '50%',
+        background: COLORS.gradientPrimary, border: 'none', cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        boxShadow: '0 4px 20px rgba(37,99,235,0.4)', zIndex: 1000,
+        transition: 'transform 0.2s',
+      },
+      onMouseEnter: (e) => e.currentTarget.style.transform = 'scale(1.1)',
+      onMouseLeave: (e) => e.currentTarget.style.transform = 'scale(1)',
+    }, Icons.messageCircle(24, '#fff'));
+  }
+
+  // Chat panel
+  return React.createElement('div', {
+    style: {
+      position: 'fixed', bottom: responsive.isMobile ? '0' : '24px', right: responsive.isMobile ? '0' : '24px',
+      width: responsive.isMobile ? '100%' : '380px', height: responsive.isMobile ? '100vh' : '520px',
+      background: c.surface, border: `1px solid ${c.border}`, borderRadius: responsive.isMobile ? '0' : RADIUS.xl,
+      boxShadow: c.cardShadow, display: 'flex', flexDirection: 'column', zIndex: 1001, overflow: 'hidden',
+    },
+  },
+    // Header
+    React.createElement('div', {
+      style: {
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '16px', borderBottom: `1px solid ${c.border}`,
+        background: COLORS.gradientPrimary,
+      },
+    },
+      React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '10px' } },
+        Icons.messageCircle(20, '#fff'),
+        React.createElement('span', { style: { fontSize: FONT_SIZES.base, fontWeight: 700, color: '#fff' } }, 'NexaConnect Assistant'),
+      ),
+      React.createElement('button', {
+        onClick: () => setIsOpen(false),
+        style: { background: 'none', border: 'none', cursor: 'pointer', padding: '4px', borderRadius: RADIUS.sm },
+      }, Icons.x(20, '#fff')),
+    ),
+
+    // Messages
+    React.createElement('div', {
+      style: { flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' },
+    },
+      !canAccessFeature(provider.tier, 'aiAssistant')
+        ? React.createElement('div', { style: { textAlign: 'center', padding: '24px' } },
+            Icons.lock(32, c.textMuted),
+            React.createElement('p', { style: { fontSize: FONT_SIZES.base, fontWeight: 700, color: c.text, marginTop: '12px' } }, 'AI Assistant Locked'),
+            React.createElement('p', { style: { fontSize: FONT_SIZES.sm, color: c.textSecondary, marginBottom: '16px' } }, 'Upgrade to Professional to unlock the AI Assistant.'),
+          )
+        : messages.map((msg, i) =>
+          React.createElement('div', {
+            key: i,
+            style: {
+              alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
+              maxWidth: '85%', padding: '10px 14px', borderRadius: RADIUS.lg,
+              background: msg.role === 'user' ? COLORS.primary[500] : c.surfaceAlt,
+              color: msg.role === 'user' ? '#fff' : c.text,
+              fontSize: FONT_SIZES.sm, lineHeight: 1.6,
+              borderBottomRightRadius: msg.role === 'user' ? '4px' : RADIUS.lg,
+              borderBottomLeftRadius: msg.role === 'assistant' ? '4px' : RADIUS.lg,
+            },
+          }, msg.text),
+        ),
+      loading && React.createElement('div', {
+        style: { alignSelf: 'flex-start', padding: '10px 14px', borderRadius: RADIUS.lg, background: c.surfaceAlt, fontSize: FONT_SIZES.sm, color: c.textMuted },
+      }, 'Typing...'),
+      React.createElement('div', { ref: messagesEndRef }),
+    ),
+
+    // Input
+    canAccessFeature(provider.tier, 'aiAssistant') && React.createElement('div', {
+      style: { display: 'flex', gap: '8px', padding: '12px 16px', borderTop: `1px solid ${c.border}` },
+    },
+      React.createElement('input', {
+        value: input, onChange: (e) => setInput(e.target.value),
+        onKeyDown: (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } },
+        placeholder: 'Ask me anything...',
+        style: {
+          flex: 1, padding: '10px 14px', borderRadius: RADIUS.md,
+          border: `1px solid ${c.border}`, background: c.surfaceAlt,
+          color: c.text, fontFamily: FONTS.sans, fontSize: FONT_SIZES.sm, outline: 'none',
+        },
+      }),
+      React.createElement('button', {
+        onClick: sendMessage, disabled: loading || !input.trim(),
+        style: {
+          width: '40px', height: '40px', borderRadius: RADIUS.md,
+          background: loading || !input.trim() ? c.border : COLORS.gradientPrimary,
+          border: 'none', cursor: loading || !input.trim() ? 'not-allowed' : 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        },
+      }, Icons.send(18, '#fff')),
+    ),
+  );
+}
+
 function AppRouter() {
   const { state } = useApp();
   const route = state.route;
@@ -5791,6 +6124,21 @@ function App() {
         if (dbReviews) dispatch({ type: ACTION_TYPES.SET_DB_REVIEWS, payload: dbReviews });
         if (dbEnquiries) dispatch({ type: ACTION_TYPES.SET_DB_ENQUIRIES, payload: dbEnquiries });
         if (dbBookings) dispatch({ type: ACTION_TYPES.SET_DB_BOOKINGS, payload: dbBookings });
+
+        // Load leads for logged-in provider
+        const savedUser = JSON.parse(localStorage.getItem('nexaconnect_state') || '{}').user;
+        if (savedUser?.role === 'provider') {
+          const providerRec = await db.fetchProviderByUserId(savedUser.id);
+          if (providerRec) {
+            const dbLeads = await db.fetchLeads(providerRec.id);
+            if (dbLeads) dispatch({ type: ACTION_TYPES.SET_DB_LEADS, payload: dbLeads });
+          }
+        }
+        // Load notifications for logged-in user
+        if (savedUser?.id) {
+          const dbNotifs = await db.fetchNotifications(savedUser.id);
+          if (dbNotifs) dispatch({ type: ACTION_TYPES.SET_DB_NOTIFICATIONS, payload: dbNotifs });
+        }
       } catch (err) {
         console.error('Failed to load data from Supabase:', err);
       }
@@ -5816,6 +6164,28 @@ function App() {
         });
       }
     } else if (params.get('checkout') === 'cancelled') {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+    // Handle lead unlock checkout return
+    if (params.get('lead_checkout') === 'success') {
+      const leadId = params.get('lead_id');
+      window.history.replaceState({}, '', window.location.pathname);
+      if (leadId) {
+        // Optimistically update lead
+        dispatch({ type: ACTION_TYPES.UNLOCK_LEAD, payload: leadId });
+        // Re-fetch leads from DB
+        if (isSupabaseConfigured() && state.user) {
+          db.fetchProviderByUserId(state.user.id).then(provider => {
+            if (provider) {
+              db.fetchLeads(provider.id).then(leads => {
+                if (leads) dispatch({ type: ACTION_TYPES.SET_DB_LEADS, payload: leads });
+              });
+            }
+          });
+        }
+        dispatch({ type: ACTION_TYPES.SET_DASHBOARD_TAB, payload: 'leads' });
+      }
+    } else if (params.get('lead_checkout') === 'cancelled') {
       window.history.replaceState({}, '', window.location.pathname);
     }
   }, []);
@@ -5878,6 +6248,7 @@ function App() {
           React.createElement(PageShell, null,
             React.createElement(AppRouter),
           ),
+          React.createElement(AIChatbot),
         ),
       ),
     ),
