@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useReducer, useCallback, useMemo, useRef, createContext, useContext, Fragment } from 'react';
 import { LineChart, Line, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
         XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { supabase, isSupabaseConfigured } from './supabase';
+import { supabase, isSupabaseConfigured, subscribeToTable, unsubscribeChannel } from './supabase';
 import * as db from './db.js';
 import { isStripeConfigured, redirectToCheckout, redirectToLeadUnlock, openBillingPortal } from './stripe.js';
 
@@ -716,6 +716,35 @@ function ToastContainer({ toasts }) {
 }
 
 
+// ── Real-Time Messaging Listener ──
+function RealtimeListener() {
+  const { state, dispatch } = useApp();
+  const { addToast } = useToast();
+  useEffect(() => {
+    if (!isSupabaseConfigured() || !state.user) return;
+    const channel = subscribeToTable('enquiries', 'UPDATE', null, (payload) => {
+      const row = payload.new;
+      if (!row || !row.messages || row.messages.length === 0) return;
+      const lastMsg = row.messages[row.messages.length - 1];
+      // Determine if current user is involved
+      const isProvider = state.providers.some(p => p.id === row.provider_id && p.email === state.user.email);
+      const isParticipant = state.participants.some(p => p.id === row.participant_id && p.email === state.user.email);
+      if (!isProvider && !isParticipant) return;
+      // Skip own messages
+      if ((isProvider && lastMsg.from === 'provider') || (isParticipant && lastMsg.from === 'participant')) return;
+      const preview = lastMsg.text.length > 60 ? lastMsg.text.slice(0, 57) + '...' : lastMsg.text;
+      addToast(`New message: ${preview}`, 'info');
+      dispatch({ type: 'ADD_NOTIFICATION', payload: { type: 'message', title: 'New Message', body: preview } });
+      // Re-fetch enquiries
+      db.fetchEnquiries(state.user.authId, state.user.role).then(enqs => {
+        if (enqs) dispatch({ type: 'SET_ENQUIRIES', payload: enqs });
+      });
+    });
+    return () => { if (channel) unsubscribeChannel(channel); };
+  }, [state.user?.email]);
+  return null;
+}
+
 /* ═══════════════════════════════════════════════════════════════
    Phase 2: Data Layer
    ═══════════════════════════════════════════════════════════════ */
@@ -1314,6 +1343,7 @@ const FEATURE_MIN_TIER = {
   featuredSpot: 'elite',
   advancedAnalytics: 'elite',
   dedicatedSupport: 'elite',
+  profileCustomization: 'professional',
 };
 function canAccessFeature(tier, feature) {
   const minTier = FEATURE_MIN_TIER[feature];
@@ -1387,6 +1417,65 @@ function calcResponseTime(provider, enquiries) {
   return `Usually responds within ${days} ${days === 1 ? 'day' : 'days'}`;
 }
 
+// ── Lead Response Time Calculator ──
+function calcLeadResponseTime(provider, leads) {
+  const pLeads = leads.filter(l => l.providerId === provider.id && l.status === 'unlocked' && l.unlockedAt && l.firstResponseAt);
+  if (pLeads.length === 0) return null;
+  let totalHours = 0;
+  pLeads.forEach(l => {
+    const unlocked = new Date(l.unlockedAt);
+    const responded = new Date(l.firstResponseAt);
+    totalHours += (responded - unlocked) / (1000 * 60 * 60);
+  });
+  return totalHours / pLeads.length;
+}
+
+function formatLeadResponseTime(avgHours) {
+  if (avgHours === null || avgHours === undefined) return null;
+  if (avgHours < 1) return 'Responds within 1 hour';
+  if (avgHours < 24) return `Responds within ${Math.round(avgHours)} hours`;
+  const days = Math.round(avgHours / 24);
+  return `Responds within ${days} ${days === 1 ? 'day' : 'days'}`;
+}
+
+function isFastResponder(avgHours) {
+  return avgHours !== null && avgHours !== undefined && avgHours < 4;
+}
+
+// ── Video Embed Parser ──
+function parseVideoEmbed(url) {
+  if (!url) return null;
+  // YouTube
+  const ytMatch = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([^&?\s]+)/);
+  if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}`;
+  // Vimeo
+  const vmMatch = url.match(/vimeo\.com\/(?:video\/)?(\d+)/);
+  if (vmMatch) return `https://player.vimeo.com/video/${vmMatch[1]}`;
+  return null;
+}
+
+// ── Receipt Printer ──
+function printReceipt(contentHtml) {
+  const w = window.open('', '_blank', 'width=600,height=800');
+  if (!w) return;
+  w.document.write(`<!DOCTYPE html><html><head><title>NexaConnect Receipt</title>
+<style>body{font-family:'DM Sans',-apple-system,sans-serif;padding:40px;color:#111827;max-width:500px;margin:0 auto}
+.header{text-align:center;margin-bottom:32px;padding-bottom:16px;border-bottom:2px solid #E5E7EB}
+.header h1{font-size:20px;color:#2563EB;margin:0 0 4px}.header p{font-size:12px;color:#6B7280;margin:0}
+.row{display:flex;justify-content:space-between;padding:8px 0;font-size:14px}.row.total{border-top:2px solid #111827;margin-top:12px;padding-top:12px;font-weight:700;font-size:16px}
+.badge{display:inline-block;background:#DCFCE7;color:#166534;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}
+.footer{text-align:center;margin-top:32px;padding-top:16px;border-top:1px solid #E5E7EB;font-size:11px;color:#9CA3AF}
+@media print{body{padding:20px}}</style></head><body>
+<div class="header"><h1>NexaConnect</h1><p>NDIS Provider-Participant Marketplace</p></div>
+${contentHtml}
+<div class="footer"><p>Thank you for using NexaConnect</p><p>ABN: 00 000 000 000 | support@nexaconnect.com.au</p></div>
+</body></html>`);
+  w.document.close();
+  w.focus();
+  w.print();
+  setTimeout(() => w.close(), 1000);
+}
+
 // ── Onboarding Steps Checker ──
 function getOnboardingSteps(provider) {
   return [
@@ -1456,11 +1545,12 @@ function rankProviders(providers, query, filters) {
     results = results.filter(p => p.verified);
   }
 
-  // Sort by tier weight + rating + response rate
+  // Sort by tier weight + rating + response rate + promoted bonus
   results.sort((a, b) => {
     const tierWeight = { elite: 150, premium: 100, professional: 50, starter: 0 };
-    const scoreA = tierWeight[a.tier] + (a.rating * 10) + (a.responseRate * 0.5);
-    const scoreB = tierWeight[b.tier] + (b.rating * 10) + (b.responseRate * 0.5);
+    const promotedBonus = (tier) => { const p = PLANS.find(pl => pl.id === tier); return (p && p.limits.promoted) ? 50 : 0; };
+    const scoreA = tierWeight[a.tier] + (a.rating * 10) + (a.responseRate * 0.5) + promotedBonus(a.tier);
+    const scoreB = tierWeight[b.tier] + (b.rating * 10) + (b.responseRate * 0.5) + promotedBonus(b.tier);
     return scoreB - scoreA;
   });
 
@@ -1539,6 +1629,10 @@ const ACTION_TYPES = {
   DECLINE_LEAD: 'DECLINE_LEAD',
   SET_DB_LEADS: 'SET_DB_LEADS',
   SET_DB_NOTIFICATIONS: 'SET_DB_NOTIFICATIONS',
+  // Phase 4: Lead Lifecycle
+  LINK_LEAD_ENQUIRY: 'LINK_LEAD_ENQUIRY',
+  SET_LEAD_FIRST_RESPONSE: 'SET_LEAD_FIRST_RESPONSE',
+  SET_DB_PARTICIPANT_LEADS: 'SET_DB_PARTICIPANT_LEADS',
 };
 
 function getInitialState() {
@@ -1758,11 +1852,17 @@ function appReducer(state, action) {
       return { ...state, leads: [newLead, ...state.leads] };
     }
     case ACTION_TYPES.UNLOCK_LEAD:
-      return { ...state, leads: state.leads.map(l => l.id === action.payload ? { ...l, status: 'unlocked' } : l) };
+      return { ...state, leads: state.leads.map(l => l.id === action.payload ? { ...l, status: 'unlocked', unlockedAt: new Date().toISOString() } : l) };
     case ACTION_TYPES.DECLINE_LEAD:
       return { ...state, leads: state.leads.map(l => l.id === action.payload ? { ...l, status: 'declined' } : l) };
     case ACTION_TYPES.SET_DB_LEADS:
       return { ...state, leads: action.payload };
+    case ACTION_TYPES.LINK_LEAD_ENQUIRY:
+      return { ...state, leads: state.leads.map(l => l.id === action.payload.leadId ? { ...l, enquiryId: action.payload.enquiryId } : l) };
+    case ACTION_TYPES.SET_LEAD_FIRST_RESPONSE:
+      return { ...state, leads: state.leads.map(l => l.id === action.payload ? { ...l, firstResponseAt: new Date().toISOString() } : l) };
+    case ACTION_TYPES.SET_DB_PARTICIPANT_LEADS:
+      return { ...state, leads: [...state.leads.filter(sl => !action.payload.some(pl => pl.id === sl.id)), ...action.payload] };
     case ACTION_TYPES.SET_DB_NOTIFICATIONS:
       return { ...state, notifications: [...NOTIFICATIONS_DATA, ...action.payload.filter(dbn => !NOTIFICATIONS_DATA.some(mn => mn.id === dbn.id))] };
     default:
@@ -2073,6 +2173,7 @@ function Sidebar() {
     { key:'overview',label:'Overview',icon:Icons.home },
     { key:'favourites',label:'Favourites',icon:Icons.heart },
     { key:'enquiries',label:'Enquiries',icon:Icons.mail },
+    { key:'my-requests',label:'My Requests',icon:Icons.users },
     { key:'bookings',label:'Bookings',icon:Icons.calendar },
     { key:'my-reviews',label:'My Reviews',icon:Icons.star },
     { key:'settings',label:'Settings',icon:Icons.settings },
@@ -2082,6 +2183,7 @@ function Sidebar() {
     { key:'users',label:'Users',icon:Icons.users },
     { key:'providers-mgmt',label:'Providers',icon:Icons.briefcase },
     { key:'revenue',label:'Revenue',icon:Icons.dollarSign },
+    { key:'leads-admin',label:'Leads',icon:Icons.users },
     { key:'activity',label:'Activity',icon:Icons.activity },
     { key:'reports',label:'Reports',icon:Icons.flag },
   ];
@@ -2373,6 +2475,34 @@ function LandingPage() {
         ),
       ),
     ),
+
+    // Featured Providers Carousel
+    (() => {
+      const featuredProviders = state.providers.filter(p => p.tier === 'premium' || p.tier === 'elite').slice(0, 6);
+      return featuredProviders.length > 0 ? React.createElement('section', { style: { padding: responsive.isMobile ? '40px 20px' : '80px 40px', background: c.surfaceAlt } },
+        React.createElement('div', { style: { maxWidth: '1200px', margin: '0 auto' } },
+          React.createElement('div', { style: { textAlign: 'center', marginBottom: '32px' } },
+            React.createElement('h2', { style: { fontSize: responsive.isMobile ? FONT_SIZES['2xl'] : FONT_SIZES['3xl'], fontFamily: FONTS.display, fontWeight: 400, color: c.text, marginBottom: '8px' } }, 'Featured Providers'),
+            React.createElement('p', { style: { color: c.textSecondary, fontSize: FONT_SIZES.md } }, 'Top-rated NDIS providers ready to support you'),
+          ),
+          React.createElement('div', { style: { display: 'flex', gap: '16px', overflowX: 'auto', paddingBottom: '12px' } },
+            featuredProviders.map(fp => React.createElement('div', {
+              key: fp.id,
+              onClick: () => { dispatch({type:ACTION_TYPES.SET_SELECTED_PROVIDER,payload:fp.id}); dispatch({type:ACTION_TYPES.NAV_GOTO,payload:{route:'provider-profile',params:{providerId:fp.id}}}); },
+              style: { minWidth: '220px', flex: '0 0 auto', padding: '20px', borderRadius: RADIUS.lg, border: `1px solid ${c.border}`, background: c.surface, cursor: 'pointer', textAlign: 'center', transition: 'all 0.2s' },
+              onMouseEnter: (e) => { e.currentTarget.style.borderColor = COLORS.primary[500]; e.currentTarget.style.transform = 'translateY(-2px)'; },
+              onMouseLeave: (e) => { e.currentTarget.style.borderColor = c.border; e.currentTarget.style.transform = 'translateY(0)'; },
+            },
+              React.createElement(Avatar, { name: fp.name, size: 56, style: { margin: '0 auto 12px' } }),
+              React.createElement('h4', { style: { fontSize: FONT_SIZES.base, fontWeight: 700, color: c.text, marginBottom: '4px' } }, fp.name),
+              React.createElement(Badge, { variant: fp.tier, size: 'xs', style: { marginBottom: '8px' } }, fp.tier.charAt(0).toUpperCase() + fp.tier.slice(1)),
+              React.createElement('p', { style: { fontSize: FONT_SIZES.xs, color: c.textSecondary, lineHeight: 1.4, marginBottom: '8px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' } }, fp.shortDescription),
+              React.createElement(StarRating, { rating: fp.rating, size: 12, showValue: true }),
+            )),
+          ),
+        ),
+      ) : null;
+    })(),
 
     // How It Works
     React.createElement('section', { style: { padding: responsive.isMobile ? '60px 20px' : '130px 40px', background: COLORS.primary[900], position: 'relative', overflow: 'hidden' } },
@@ -3412,6 +3542,7 @@ function ProviderCard({ provider, onView, onFavourite, isFavourite, onCompare, i
     },
   },
     React.createElement('div', { style: { position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: tierColors[provider.tier] || c.textMuted } }),
+    (() => { const plan = PLANS.find(p => p.id === provider.tier); return plan && plan.limits.promoted ? React.createElement('div', { style: { position: 'absolute', top: '8px', right: '8px', zIndex: 2, display: 'flex', alignItems: 'center', gap: '3px', background: `${COLORS.warning}20`, color: COLORS.warning, padding: '2px 8px', borderRadius: RADIUS.full, fontSize: FONT_SIZES.xs, fontWeight: 700 } }, Icons.zap(11, COLORS.warning), 'Sponsored') : null; })(),
 
     React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' } },
       React.createElement('div', { style: { display: 'flex', gap: '12px', alignItems: 'center', flex: 1 } },
@@ -3463,10 +3594,11 @@ function ProviderCard({ provider, onView, onFavourite, isFavourite, onCompare, i
       React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '4px' } },
         React.createElement(StarRating, { rating: provider.rating, size: 14 }),
         React.createElement('span', { style: { fontSize: FONT_SIZES.xs, color: c.textMuted, marginLeft: '4px' } }, `(${provider.reviewCount})`),
+        (() => { const avg = calcLeadResponseTime(provider, state.leads || []); return avg !== null && isFastResponder(avg) ? React.createElement(Badge, { variant: 'success', size: 'xs', style: { marginLeft: '4px' } }, Icons.zap(10, COLORS.success), ' Fast') : null; })(),
       ),
       React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
         React.createElement('span', { style: { fontSize: FONT_SIZES.xs, color: c.textMuted, display: 'flex', alignItems: 'center', gap: '3px' } },
-          Icons.clock(12, c.textMuted), calcResponseTime(provider, state.enquiries || [])),
+          Icons.clock(12, c.textMuted), (() => { const avg = calcLeadResponseTime(provider, state.leads || []); const formatted = formatLeadResponseTime(avg); return formatted || calcResponseTime(provider, state.enquiries || []); })()),
         React.createElement('span', { style: { fontSize: FONT_SIZES.xs, color: c.textMuted, display: 'flex', alignItems: 'center', gap: '3px' } },
           Icons.mapPin(12, c.textMuted), provider.waitTime),
       ),
@@ -3753,6 +3885,17 @@ function ProviderProfilePage() {
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportData, setReportData] = useState({ reason: '', notes: '' });
 
+  // Track profile views (non-self)
+  useEffect(() => {
+    if (provider && state.user && state.user.email !== provider.email) {
+      const newViews = (provider.viewsThisMonth || 0) + 1;
+      dispatch({ type: ACTION_TYPES.UPDATE_PROVIDER_PROFILE, payload: { id: provider.id, viewsThisMonth: newViews } });
+      if (isSupabaseConfigured() && provider.id && !provider.id.startsWith('p')) {
+        db.updateProvider(provider.id, { viewsThisMonth: newViews });
+      }
+    }
+  }, [provider?.id]);
+
   if (!provider) return React.createElement(EmptyState, { title: 'Provider not found', action: React.createElement(Button, { onClick: () => dispatch({type:ACTION_TYPES.NAV_GOTO,payload:{route:'directory'}}) }, 'Back to Directory') });
 
   const participant = state.user?.role === 'participant' ? state.participants.find(p => p.id === state.user.id) : null;
@@ -3811,7 +3954,7 @@ function ProviderProfilePage() {
 
     // Hero Card
     React.createElement(Card, { style: { marginBottom: '24px', overflow: 'hidden', position: 'relative' } },
-      React.createElement('div', { style: { height: '120px', background: `linear-gradient(135deg, ${tierColors[provider.tier]}30, ${COLORS.primary[500]}20)`, margin: '-24px -24px 20px' } }),
+      React.createElement('div', { style: { height: '160px', background: provider.coverPhoto ? `url(${provider.coverPhoto}) center/cover` : `linear-gradient(135deg, ${provider.brandColor || tierColors[provider.tier]}30, ${COLORS.primary[500]}20)`, margin: '-24px -24px 20px' } }),
       React.createElement('div', { style: { display: 'flex', gap: '16px', alignItems: responsive.isMobile ? 'flex-start' : 'center', flexDirection: responsive.isMobile ? 'column' : 'row' } },
         React.createElement(Avatar, { name: provider.name, size: 72, style: { marginTop: '-36px', border: `3px solid ${c.surface}` } }),
         React.createElement('div', { style: { flex: 1 } },
@@ -3819,6 +3962,7 @@ function ProviderProfilePage() {
             React.createElement('h1', { style: { fontSize: FONT_SIZES.xl, fontWeight: 800, color: c.text } }, provider.name),
             provider.verified && Icons.verified(20, COLORS.accent[500]),
             React.createElement(Badge, { variant: provider.tier }, provider.tier.charAt(0).toUpperCase() + provider.tier.slice(1)),
+            (() => { const avg = calcLeadResponseTime(provider, state.leads); return avg !== null && isFastResponder(avg) ? React.createElement(Badge, { variant: 'success', size: 'xs' }, Icons.zap(12, COLORS.success), ' Fast Responder') : null; })(),
           ),
           React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '16px', marginTop: '8px', flexWrap: 'wrap' } },
             React.createElement('span', { style: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: FONT_SIZES.sm, color: c.textSecondary } }, Icons.mapPin(14), provider.suburb + ', ' + provider.state),
@@ -3843,7 +3987,7 @@ function ProviderProfilePage() {
             style: { background: 'none', border: `1px solid ${c.border}`, borderRadius: RADIUS.md, padding: '8px', cursor: 'pointer', color: isFav ? COLORS.error : c.textMuted },
           }, isFav ? Icons.heartFilled(18, COLORS.error) : Icons.heart(18)),
           React.createElement(Button, { variant: 'secondary', size: 'sm', onClick: () => setShowLeadForm(true), icon: Icons.users(16) }, 'Connect'),
-          React.createElement(Button, { variant: 'ghost', size: 'sm', onClick: () => setShowEnquiryModal(true), icon: Icons.mail(16) }, 'Enquire'),
+          React.createElement(Button, { variant: 'ghost', size: 'sm', onClick: () => setShowEnquiryModal(true), icon: Icons.mail(16) }, provider.ctaText || 'Enquire'),
           (provider.tier === 'premium' || provider.tier === 'elite') && React.createElement(Button, { variant: 'primary', size: 'sm', onClick: () => setShowBookingModal(true), icon: Icons.calendar(16) }, 'Book'),
           React.createElement(Button, { variant: 'ghost', size: 'sm', onClick: () => setShowReportModal(true), icon: Icons.flag(16, COLORS.error), style: { color: COLORS.error } }, 'Report'),
         ),
@@ -3860,6 +4004,29 @@ function ProviderProfilePage() {
     activeTab === 'about' && React.createElement(Card, null,
       React.createElement('h3', { style: { fontSize: FONT_SIZES.lg, fontWeight: 700, color: c.text, marginBottom: '12px' } }, 'About'),
       React.createElement('p', { style: { color: c.textSecondary, lineHeight: 1.7, marginBottom: '20px' } }, provider.description),
+
+      // Video embed
+      provider.videoUrl && parseVideoEmbed(provider.videoUrl) && React.createElement('div', { style: { position: 'relative', paddingBottom: '56.25%', height: 0, marginBottom: '20px', borderRadius: RADIUS.md, overflow: 'hidden' } },
+        React.createElement('iframe', { src: parseVideoEmbed(provider.videoUrl), style: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }, allow: 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture', allowFullScreen: true }),
+      ),
+
+      // Photo gallery (actual images instead of text placeholders)
+      provider.photos && provider.photos.length > 0 && React.createElement(Fragment, null,
+        React.createElement('h4', { style: { fontSize: FONT_SIZES.base, fontWeight: 700, color: c.text, marginBottom: '12px' } }, 'Gallery'),
+        React.createElement('div', { style: { display: 'grid', gridTemplateColumns: provider.galleryLayout === 'masonry' ? 'repeat(auto-fill, minmax(150px, 1fr))' : provider.galleryLayout === 'carousel' ? 'none' : 'repeat(auto-fill, minmax(150px, 1fr))', gap: '8px', marginBottom: '20px', ...(provider.galleryLayout === 'carousel' ? { display: 'flex', overflowX: 'auto', paddingBottom: '8px' } : {}) } },
+          provider.photos.map((p, i) => React.createElement('div', { key: i, style: { ...(provider.galleryLayout === 'carousel' ? { minWidth: '200px', flexShrink: 0 } : {}), height: provider.galleryLayout === 'masonry' ? (i % 3 === 0 ? '180px' : '120px') : '120px', borderRadius: RADIUS.md, overflow: 'hidden', background: COLORS.gradientCard } },
+            p.startsWith('http') ? React.createElement('img', { src: p, alt: `Photo ${i+1}`, style: { width: '100%', height: '100%', objectFit: 'cover' } })
+            : React.createElement('div', { style: { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                React.createElement('span', { style: { fontSize: FONT_SIZES.xs, color: c.textMuted, textAlign: 'center', padding: '8px' } }, p)),
+          )),
+        ),
+      ),
+
+      // Featured services badges
+      provider.featuredServices && provider.featuredServices.length > 0 && React.createElement('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '20px' } },
+        provider.featuredServices.map((svcId, i) => { const cat = CATEGORIES.find(ct => ct.id === svcId); return cat ? React.createElement(Badge, { key: i, variant: 'primary', size: 'sm' }, Icons.star(12, COLORS.primary[500]), ' ', cat.name) : null; }),
+      ),
+
       React.createElement('div', { style: { display: 'grid', gridTemplateColumns: responsive.isMobile ? '1fr' : 'repeat(2, 1fr)', gap: '16px' } },
         [['Founded', provider.founded], ['Team Size', provider.teamSize], ['Response Time', provider.responseTime], ['Wait Time', provider.waitTime],
          ['Response Rate', provider.responseRate + '%'], ['Languages', provider.languages.join(', ')],
@@ -3885,15 +4052,7 @@ function ProviderProfilePage() {
           provider.features.map((f, i) => React.createElement(Badge, { key: i, variant: 'success', size: 'xs' }, f)),
         ),
       ),
-      provider.photos.length > 0 && React.createElement(Fragment, null,
-        React.createElement(Divider),
-        React.createElement('h4', { style: { fontSize: FONT_SIZES.base, fontWeight: 700, color: c.text, marginBottom: '12px' } }, 'Photos'),
-        React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '8px' } },
-          provider.photos.map((p, i) => React.createElement('div', { key: i, style: { height: '100px', borderRadius: RADIUS.md, background: COLORS.gradientCard, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
-            React.createElement('span', { style: { fontSize: FONT_SIZES.xs, color: c.textMuted, textAlign: 'center', padding: '8px' } }, p),
-          )),
-        ),
-      ),
+      // Photos section moved to gallery above
     ),
 
     activeTab === 'services' && React.createElement(Card, null,
@@ -4125,6 +4284,9 @@ function ProviderDashboard() {
     description: provider.description, shortDescription: provider.shortDescription,
     phone: provider.phone, website: provider.website,
     suburb: provider.suburb, waitTime: provider.waitTime,
+    coverPhoto: provider.coverPhoto || '', brandColor: provider.brandColor || '',
+    ctaText: provider.ctaText || 'Get in Touch', videoUrl: provider.videoUrl || '',
+    featuredServices: provider.featuredServices || [], galleryLayout: provider.galleryLayout || 'grid',
   } : {});
   const [selectedEnquiry, setSelectedEnquiry] = useState(null);
   const [replyText, setReplyText] = useState('');
@@ -4161,6 +4323,7 @@ function ProviderDashboard() {
       React.createElement(StatCard, { icon: Icons.mail(20, COLORS.accent[400]), label: 'Enquiries', value: provider.enquiriesThisMonth, change: 8, trend: 'up' }),
       React.createElement(StatCard, { icon: Icons.calendar(20, COLORS.success), label: 'Bookings', value: provider.bookingsThisMonth, change: 15, trend: 'up' }),
       React.createElement(StatCard, { icon: Icons.star(20, COLORS.star), label: 'Rating', value: provider.rating.toFixed(1), change: 2, trend: 'up' }),
+      (() => { const avg = calcLeadResponseTime(provider, state.leads); const formatted = formatLeadResponseTime(avg); return formatted ? React.createElement(StatCard, { icon: Icons.clock(20, isFastResponder(avg) ? COLORS.success : COLORS.primary[400]), label: 'Avg Response Time', value: formatted }) : null; })(),
     ),
 
     // Onboarding Wizard
@@ -4318,6 +4481,125 @@ function ProviderDashboard() {
           ),
         ),
       ),
+
+      // ── 3 New Analytics Charts ──
+      React.createElement('div', { style: { display: 'grid', gridTemplateColumns: responsive.isMobile ? '1fr' : 'repeat(3, 1fr)', gap: '24px', marginTop: '24px' } },
+        // Daily Profile Visitors
+        React.createElement(Card, null,
+          React.createElement('h3', { style: { fontSize: FONT_SIZES.base, fontWeight: 700, color: c.text, marginBottom: '16px' } }, 'Daily Profile Visitors'),
+          React.createElement(ResponsiveContainer, { width: '100%', height: 200 },
+            React.createElement(BarChart, { data: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((d, i) => ({ day: d, visitors: Math.round((provider.viewsThisMonth || 30) / 7 * (0.7 + Math.sin(i) * 0.5)) })) },
+              React.createElement(CartesianGrid, { strokeDasharray: '3 3', stroke: c.border }),
+              React.createElement(XAxis, { dataKey: 'day', stroke: c.textMuted, fontSize: 11 }),
+              React.createElement(YAxis, { stroke: c.textMuted, fontSize: 11 }),
+              React.createElement(Tooltip, { contentStyle: { background: c.surface, border: `1px solid ${c.border}`, borderRadius: RADIUS.md } }),
+              React.createElement(Bar, { dataKey: 'visitors', fill: COLORS.primary[400], radius: [4, 4, 0, 0] }),
+            ),
+          ),
+        ),
+        // Lead Conversion Funnel
+        React.createElement(Card, null,
+          React.createElement('h3', { style: { fontSize: FONT_SIZES.base, fontWeight: 700, color: c.text, marginBottom: '16px' } }, 'Lead Conversion Funnel'),
+          (() => {
+            const views = provider.viewsThisMonth || 0;
+            const enquiries = provider.enquiriesThisMonth || 0;
+            const bookings = provider.bookingsThisMonth || 0;
+            const maxVal = Math.max(views, 1);
+            const steps = [
+              { label: 'Profile Views', value: views, pct: '100%' },
+              { label: 'Enquiries', value: enquiries, pct: views > 0 ? Math.round(enquiries / views * 100) + '%' : '0%' },
+              { label: 'Bookings', value: bookings, pct: enquiries > 0 ? Math.round(bookings / enquiries * 100) + '%' : '0%' },
+            ];
+            return React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
+              steps.map((s, i) => React.createElement('div', { key: i },
+                React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '4px' } },
+                  React.createElement('span', { style: { fontSize: FONT_SIZES.sm, color: c.text, fontWeight: 600 } }, s.label),
+                  React.createElement('span', { style: { fontSize: FONT_SIZES.sm, color: c.textMuted } }, `${s.value} (${s.pct})`),
+                ),
+                React.createElement('div', { style: { height: '24px', background: `${c.border}`, borderRadius: RADIUS.sm, overflow: 'hidden' } },
+                  React.createElement('div', { style: { width: `${Math.max(s.value / maxVal * 100, 2)}%`, height: '100%', background: i === 0 ? COLORS.primary[500] : i === 1 ? COLORS.accent[500] : COLORS.success, borderRadius: RADIUS.sm, transition: 'width 0.5s' } }),
+                ),
+              )),
+            );
+          })(),
+        ),
+        // Search Ranking Position
+        React.createElement(Card, { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' } },
+          React.createElement('h3', { style: { fontSize: FONT_SIZES.base, fontWeight: 700, color: c.text, marginBottom: '16px' } }, 'Search Ranking'),
+          (() => {
+            const sorted = [...state.providers].sort((a, b) => {
+              const tw = { elite: 150, premium: 100, professional: 50, starter: 0 };
+              return (tw[b.tier] + b.rating * 10 + b.responseRate * 0.5) - (tw[a.tier] + a.rating * 10 + a.responseRate * 0.5);
+            });
+            const position = sorted.findIndex(p => p.id === provider.id) + 1;
+            return React.createElement(Fragment, null,
+              React.createElement('div', { style: { fontSize: '3.5rem', fontWeight: 900, background: COLORS.gradientText, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', lineHeight: 1 } }, `#${position}`),
+              React.createElement('p', { style: { fontSize: FONT_SIZES.sm, color: c.textMuted, marginTop: '8px' } }, `of ${state.providers.length} providers`),
+              position <= 3 && React.createElement(Badge, { variant: 'success', size: 'sm', style: { marginTop: '8px' } }, 'Top 3'),
+            );
+          })(),
+        ),
+      ),
+
+      // ── Advanced Analytics (Elite only) ──
+      React.createElement(LockedFeature, { tier: provider.tier, feature: 'advancedAnalytics' },
+        React.createElement('div', { style: { marginTop: '24px' } },
+          React.createElement('h3', { style: { fontSize: FONT_SIZES.lg, fontWeight: 700, color: c.text, marginBottom: '16px' } }, 'Advanced Analytics'),
+          React.createElement('div', { style: { display: 'grid', gridTemplateColumns: responsive.isMobile ? '1fr' : 'repeat(3, 1fr)', gap: '24px' } },
+            // vs Category Average
+            React.createElement(Card, null,
+              React.createElement('h4', { style: { fontSize: FONT_SIZES.base, fontWeight: 700, color: c.text, marginBottom: '12px' } }, 'vs. Category Average'),
+              (() => {
+                const allProviders = state.providers;
+                const avgViews = allProviders.length > 0 ? Math.round(allProviders.reduce((s, p) => s + (p.viewsThisMonth || 0), 0) / allProviders.length) : 0;
+                const avgEnquiries = allProviders.length > 0 ? Math.round(allProviders.reduce((s, p) => s + (p.enquiriesThisMonth || 0), 0) / allProviders.length) : 0;
+                const avgRating = allProviders.length > 0 ? (allProviders.reduce((s, p) => s + p.rating, 0) / allProviders.length).toFixed(1) : 0;
+                const rows = [
+                  { label: 'Views', yours: provider.viewsThisMonth, avg: avgViews },
+                  { label: 'Enquiries', yours: provider.enquiriesThisMonth, avg: avgEnquiries },
+                  { label: 'Rating', yours: provider.rating.toFixed(1), avg: avgRating },
+                ];
+                return React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '10px' } },
+                  rows.map((r, i) => { const diff = r.avg > 0 ? Math.round(((r.yours - r.avg) / r.avg) * 100) : 0; return React.createElement('div', { key: i, style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
+                    React.createElement('span', { style: { fontSize: FONT_SIZES.sm, color: c.textSecondary } }, r.label),
+                    React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
+                      React.createElement('span', { style: { fontSize: FONT_SIZES.sm, fontWeight: 700, color: c.text } }, r.yours),
+                      React.createElement('span', { style: { fontSize: FONT_SIZES.xs, fontWeight: 600, color: diff >= 0 ? COLORS.success : COLORS.error } }, diff >= 0 ? `+${diff}%` : `${diff}%`),
+                    ),
+                  ); }),
+                );
+              })(),
+            ),
+            // Monthly Trends
+            React.createElement(Card, null,
+              React.createElement('h4', { style: { fontSize: FONT_SIZES.base, fontWeight: 700, color: c.text, marginBottom: '12px' } }, 'Monthly Trends'),
+              React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '10px' } },
+                [{ label: 'Views', value: provider.viewsThisMonth, change: 12 }, { label: 'Enquiries', value: provider.enquiriesThisMonth, change: 8 }, { label: 'Bookings', value: provider.bookingsThisMonth, change: 15 }].map((t, i) =>
+                  React.createElement('div', { key: i, style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
+                    React.createElement('span', { style: { fontSize: FONT_SIZES.sm, color: c.textSecondary } }, t.label),
+                    React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '4px' } },
+                      React.createElement('span', { style: { fontSize: FONT_SIZES.sm, fontWeight: 700, color: c.text } }, t.value),
+                      React.createElement('span', { style: { fontSize: FONT_SIZES.xs, color: t.change >= 0 ? COLORS.success : COLORS.error } }, t.change >= 0 ? `\u2191 ${t.change}%` : `\u2193 ${Math.abs(t.change)}%`),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            // Response Time Stat
+            React.createElement(Card, { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' } },
+              React.createElement('h4', { style: { fontSize: FONT_SIZES.base, fontWeight: 700, color: c.text, marginBottom: '12px' } }, 'Avg Response Time'),
+              (() => {
+                const avg = calcLeadResponseTime(provider, state.leads);
+                const formatted = formatLeadResponseTime(avg);
+                return React.createElement(Fragment, null,
+                  React.createElement(StatCard, { icon: Icons.clock(24, isFastResponder(avg) ? COLORS.success : COLORS.primary[400]), label: '', value: formatted || calcResponseTime(provider, state.enquiries) }),
+                  avg !== null && isFastResponder(avg) && React.createElement(Badge, { variant: 'success', size: 'sm', style: { marginTop: '4px' } }, Icons.zap(12, COLORS.success), ' Fast Responder'),
+                );
+              })(),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -4347,6 +4629,46 @@ function ProviderDashboard() {
         React.createElement(Button, { variant: 'primary', onClick: saveProfile }, 'Save Changes'),
       ),
 
+      // Page Customization (Professional+)
+      React.createElement(LockedFeature, { tier: provider.tier, feature: 'profileCustomization' },
+        React.createElement('h3', { style: { fontSize: FONT_SIZES.lg, fontWeight: 700, color: c.text, margin: '24px 0 16px' } }, 'Page Customization'),
+        React.createElement(Card, null,
+          React.createElement(Input, { label: 'Cover Photo URL', value: editData.coverPhoto, onChange: v => setEditData(p=>({...p,coverPhoto:v})), placeholder: 'https://example.com/cover.jpg' }),
+          React.createElement('div', { style: { marginBottom: '16px' } },
+            React.createElement('label', { style: { display: 'block', fontSize: FONT_SIZES.sm, fontWeight: 600, color: c.text, marginBottom: '8px' } }, 'Brand Color'),
+            React.createElement('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
+              ['#2563EB', '#F59E0B', '#10B981', '#EF4444', '#8B5CF6', '#EC4899', '#F97316', '#06B6D4'].map(color =>
+                React.createElement('div', {
+                  key: color, onClick: () => setEditData(p=>({...p,brandColor:color})),
+                  style: { width: '36px', height: '36px', borderRadius: RADIUS.md, background: color, cursor: 'pointer',
+                    border: editData.brandColor === color ? '3px solid ' + c.text : '2px solid transparent',
+                    transition: 'all 0.15s' },
+                }),
+              ),
+            ),
+          ),
+          React.createElement(Input, { label: 'CTA Button Text', value: editData.ctaText, onChange: v => setEditData(p=>({...p,ctaText:v})), placeholder: 'Get in Touch' }),
+          React.createElement(Input, { label: 'Video URL (YouTube or Vimeo)', value: editData.videoUrl, onChange: v => setEditData(p=>({...p,videoUrl:v})), placeholder: 'https://youtube.com/watch?v=...' }),
+          React.createElement('div', { style: { marginBottom: '16px' } },
+            React.createElement('label', { style: { display: 'block', fontSize: FONT_SIZES.sm, fontWeight: 600, color: c.text, marginBottom: '8px' } }, 'Featured Services'),
+            React.createElement('div', { style: { display: 'flex', gap: '6px', flexWrap: 'wrap' } },
+              (provider.categories || []).map(catId => {
+                const cat = CATEGORIES.find(ct => ct.id === catId);
+                if (!cat) return null;
+                const isSelected = (editData.featuredServices || []).includes(catId);
+                return React.createElement('button', {
+                  key: catId, onClick: () => setEditData(p => ({ ...p, featuredServices: isSelected ? p.featuredServices.filter(s => s !== catId) : [...(p.featuredServices || []), catId] })),
+                  style: { background: isSelected ? COLORS.primary[500] : 'transparent', color: isSelected ? '#fff' : c.textSecondary, border: `1px solid ${isSelected ? COLORS.primary[500] : c.border}`, borderRadius: RADIUS.full, padding: '4px 12px', fontSize: FONT_SIZES.xs, fontWeight: 600, cursor: 'pointer', fontFamily: FONTS.sans, transition: 'all 0.15s' },
+                }, cat.name);
+              }),
+            ),
+          ),
+          React.createElement(Select, { label: 'Gallery Layout', value: editData.galleryLayout, onChange: v => setEditData(p=>({...p,galleryLayout:v})),
+            options: [{ value: 'grid', label: 'Grid' }, { value: 'masonry', label: 'Masonry' }, { value: 'carousel', label: 'Carousel' }] }),
+          React.createElement(Button, { variant: 'primary', onClick: saveProfile }, 'Save Changes'),
+        ),
+      ),
+
       React.createElement('h3', { style: { fontSize: FONT_SIZES.lg, fontWeight: 700, color: c.text, margin: '24px 0 16px' } }, 'NDIS Worker Screening Check'),
       React.createElement(Card, { style: { border: provider.workerScreeningStatus === 'verified' ? `1px solid ${COLORS.success}60` : undefined } },
         React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' } },
@@ -4373,6 +4695,12 @@ function ProviderDashboard() {
       dispatch({type:ACTION_TYPES.REPLY_ENQUIRY,payload:msgPayload});
       // Persist to DB
       db.replyEnquiry(selectedEnquiry, replyText, 'provider');
+      // Track first response for lead SLA
+      const linkedLead = state.leads.find(l => l.enquiryId === selectedEnquiry && !l.firstResponseAt);
+      if (linkedLead) {
+        dispatch({ type: ACTION_TYPES.SET_LEAD_FIRST_RESPONSE, payload: linkedLead.id });
+        db.setLeadFirstResponse(linkedLead.id);
+      }
       setReplyText('');
       setProvAttachDoc(null);
       addToast('Reply sent!', 'success');
@@ -4645,7 +4973,23 @@ function ProviderDashboard() {
                 : React.createElement(Button, { variant: 'secondary', size: 'sm', onClick: () => dispatch({type:ACTION_TYPES.NAV_GOTO,payload:{route:'pricing'}}), icon: Icons.lock(16) }, 'Upgrade to Unlock'),
               React.createElement(Button, { variant: 'ghost', size: 'sm', onClick: () => handleDeclineLead(lead) }, 'Decline'),
             ),
-            lead.status === 'unlocked' && React.createElement(Badge, { variant: 'success' }, Icons.check(14), ' Unlocked'),
+            lead.status === 'unlocked' && React.createElement(Fragment, null,
+              React.createElement(Button, {
+                variant: 'primary', size: 'sm',
+                onClick: (e) => {
+                  e.stopPropagation();
+                  if (lead.enquiryId) {
+                    setSelectedEnquiry(lead.enquiryId);
+                    dispatch({ type: ACTION_TYPES.SET_DASHBOARD_TAB, payload: 'inbox' });
+                  } else {
+                    addToast('Conversation thread is being created...', 'info');
+                  }
+                },
+                icon: Icons.mail(14),
+              }, 'Message'),
+              lead.enquiryId && React.createElement(Badge, { variant: 'success', size: 'xs' }, Icons.check(12), ' Conversation started'),
+              !lead.enquiryId && React.createElement(Badge, { variant: 'success' }, Icons.check(14), ' Unlocked'),
+            ),
             lead.status === 'declined' && React.createElement(Badge, { variant: 'default' }, 'Declined'),
           ),
         ),
@@ -4760,6 +5104,41 @@ function ProviderDashboard() {
         )),
         plan.price === 0 && React.createElement('p', { style: { color: c.textMuted, fontSize: FONT_SIZES.sm, textAlign: 'center', padding: '12px' } }, 'No billing history on free plan.'),
       ),
+
+      // Lead Unlock Payments
+      (() => {
+        const leadPayments = state.leads.filter(l => l.providerId === provider.id && l.status === 'unlocked');
+        const totalLeadSpend = leadPayments.length * 25;
+        return React.createElement(Fragment, null,
+          React.createElement('h3', { style: { fontSize: FONT_SIZES.lg, fontWeight: 700, color: c.text, margin: '32px 0 8px' } }, 'Lead Unlock Payments'),
+          React.createElement('p', { style: { fontSize: FONT_SIZES.sm, color: c.textSecondary, marginBottom: '16px' } },
+            leadPayments.length > 0 ? `${leadPayments.length} lead${leadPayments.length !== 1 ? 's' : ''} unlocked — $${totalLeadSpend} total` : 'No lead unlock payments yet'),
+          React.createElement(Card, null,
+            leadPayments.length === 0
+              ? React.createElement('p', { style: { color: c.textMuted, fontSize: FONT_SIZES.sm, textAlign: 'center', padding: '12px' } }, 'No lead unlock payments yet.')
+              : React.createElement('table', { style: { width: '100%', borderCollapse: 'collapse' } },
+                  React.createElement('thead', null,
+                    React.createElement('tr', null,
+                      ['Date', 'Description', 'Amount', 'Status', ''].map(h => React.createElement('th', { key: h || '_action', style: { textAlign: 'left', padding: '10px 12px', fontSize: FONT_SIZES.xs, fontWeight: 700, color: c.textMuted, textTransform: 'uppercase', borderBottom: `1px solid ${c.border}` } }, h)),
+                    ),
+                  ),
+                  React.createElement('tbody', null,
+                    leadPayments.sort((a, b) => new Date(b.unlockedAt || b.createdAt) - new Date(a.unlockedAt || a.createdAt)).map((lead, i) => React.createElement('tr', { key: lead.id },
+                      React.createElement('td', { style: { padding: '10px 12px', borderBottom: `1px solid ${c.border}`, fontSize: FONT_SIZES.sm, color: c.text } },
+                        new Date(lead.unlockedAt || lead.createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })),
+                      React.createElement('td', { style: { padding: '10px 12px', borderBottom: `1px solid ${c.border}`, fontSize: FONT_SIZES.sm, color: c.textSecondary } },
+                        `Lead: ${lead.category || 'General'}${lead.participantSuburb ? ' — ' + lead.participantSuburb : ''}`),
+                      React.createElement('td', { style: { padding: '10px 12px', borderBottom: `1px solid ${c.border}`, fontSize: FONT_SIZES.sm, fontWeight: 600, color: c.text } }, '$25.00'),
+                      React.createElement('td', { style: { padding: '10px 12px', borderBottom: `1px solid ${c.border}` } },
+                        React.createElement(Badge, { variant: 'success', size: 'xs' }, 'Paid')),
+                      React.createElement('td', { style: { padding: '10px 12px', borderBottom: `1px solid ${c.border}` } },
+                        React.createElement(Button, { variant: 'ghost', size: 'sm', onClick: (e) => { e.stopPropagation(); const date = new Date(lead.unlockedAt || lead.createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' }); printReceipt(`<p style="margin-bottom:4px;font-size:12px;color:#6B7280">Date: ${date}</p><p style="margin-bottom:4px;font-size:12px;color:#6B7280">Reference: ${lead.paymentIntentId || lead.id}</p><hr style="border:none;border-top:1px solid #E5E7EB;margin:16px 0"><div class="row"><span>Lead Unlock — ${lead.category || 'General'}</span><span>$25.00</span></div><div class="row"><span>GST (included)</span><span>$2.27</span></div><div class="row total"><span>Total</span><span>$25.00</span></div><p style="margin-top:16px"><span class="badge">Paid</span></p>`); } }, 'Receipt')),
+                    )),
+                  ),
+                ),
+          ),
+        );
+      })(),
     );
   }
 
@@ -4807,7 +5186,7 @@ function ParticipantDashboard() {
         { label: 'Browse Providers', icon: Icons.search, route: 'directory' },
         { label: 'My Favourites', icon: Icons.heart, tab: 'favourites' },
         { label: 'My Enquiries', icon: Icons.mail, tab: 'enquiries' },
-        { label: 'My Bookings', icon: Icons.calendar, tab: 'bookings' },
+        { label: 'My Requests', icon: Icons.users, tab: 'my-requests' },
       ].map((a, i) => React.createElement(Card, {
         key: i, hover: true,
         onClick: () => a.route ? dispatch({type:ACTION_TYPES.NAV_GOTO,payload:{route:a.route}}) : dispatch({type:ACTION_TYPES.SET_DASHBOARD_TAB,payload:a.tab}),
@@ -4822,7 +5201,7 @@ function ParticipantDashboard() {
     React.createElement('div', { style: { display: 'grid', gridTemplateColumns: responsive.isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' } },
       React.createElement(StatCard, { icon: Icons.heart(20, COLORS.error), label: 'Saved Providers', value: favourites.length }),
       React.createElement(StatCard, { icon: Icons.mail(20, COLORS.primary[500]), label: 'Enquiries Sent', value: myEnquiries.length }),
-      React.createElement(StatCard, { icon: Icons.calendar(20, COLORS.accent[500]), label: 'Bookings', value: myBookings.length }),
+      React.createElement(StatCard, { icon: Icons.users(20, COLORS.accent[500]), label: 'Support Requests', value: state.leads.filter(l => l.participantId === participant.id).length, onClick: () => dispatch({type:ACTION_TYPES.SET_DASHBOARD_TAB,payload:'my-requests'}) }),
       React.createElement(StatCard, { icon: Icons.star(20, COLORS.star), label: 'Reviews Given', value: myReviews.length }),
     ),
 
@@ -4845,6 +5224,34 @@ function ParticipantDashboard() {
         )),
       ),
     ),
+
+    // Featured Provider of the Week
+    (() => {
+      const premiumElite = state.providers.filter(p => p.tier === 'premium' || p.tier === 'elite');
+      if (premiumElite.length === 0) return null;
+      const weekNum = Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000));
+      const featured = premiumElite[weekNum % premiumElite.length];
+      return React.createElement(Card, { style: { marginTop: '24px', background: `linear-gradient(135deg, ${COLORS.primary[500]}08, ${COLORS.accent[500]}08)`, border: `1px solid ${COLORS.primary[500]}20` } },
+        React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '12px' } },
+          Icons.star(16, COLORS.warning),
+          React.createElement('h3', { style: { fontSize: FONT_SIZES.base, fontWeight: 700, color: c.text } }, 'Featured Provider of the Week'),
+        ),
+        React.createElement('div', { style: { display: 'flex', gap: '16px', alignItems: 'center' } },
+          React.createElement(Avatar, { name: featured.name, size: 56 }),
+          React.createElement('div', { style: { flex: 1 } },
+            React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' } },
+              React.createElement('h4', { style: { fontSize: FONT_SIZES.md, fontWeight: 700, color: c.text } }, featured.name),
+              React.createElement(Badge, { variant: featured.tier, size: 'xs' }, featured.tier.charAt(0).toUpperCase() + featured.tier.slice(1)),
+            ),
+            React.createElement('p', { style: { fontSize: FONT_SIZES.sm, color: c.textSecondary, lineHeight: 1.4, marginBottom: '8px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' } }, featured.shortDescription),
+            React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '12px' } },
+              React.createElement(StarRating, { rating: featured.rating, size: 12, showValue: true }),
+              React.createElement(Button, { variant: 'primary', size: 'sm', onClick: () => { dispatch({type:ACTION_TYPES.SET_SELECTED_PROVIDER,payload:featured.id}); dispatch({type:ACTION_TYPES.NAV_GOTO,payload:{route:'provider-profile',params:{providerId:featured.id}}}); } }, 'View Profile'),
+            ),
+          ),
+        ),
+      );
+    })(),
 
     // Recommended For You
     React.createElement(Card, { style: { marginTop: '24px' } },
@@ -5215,13 +5622,73 @@ function ParticipantDashboard() {
               React.createElement(Button, {
                 variant: 'primary', size: 'sm', fullWidth: true,
                 icon: Icons.download(15, '#fff'),
-                onClick: () => addToast('PDF download coming soon', 'info'),
-              }, 'Download PDF'),
+                onClick: () => { const amt = calcBookingAmount(receiptBooking).toFixed(2); const gst = (calcBookingAmount(receiptBooking) / 11).toFixed(2); const date = new Date(receiptBooking.date).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' }); printReceipt(`<p style="margin-bottom:4px;font-size:12px;color:#6B7280">Date: ${date}</p><p style="margin-bottom:4px;font-size:12px;color:#6B7280">Booking: ${receiptBooking.service}</p><p style="margin-bottom:4px;font-size:12px;color:#6B7280">Provider: ${receiptBooking.providerName}</p><p style="margin-bottom:4px;font-size:12px;color:#6B7280">Reference: ${receiptBooking.id}</p><hr style="border:none;border-top:1px solid #E5E7EB;margin:16px 0"><div class="row"><span>${receiptBooking.service} (${receiptBooking.duration})</span><span>$${amt}</span></div><div class="row"><span>GST (included)</span><span>$${gst}</span></div><div class="row total"><span>Total (NDIS Funded)</span><span>$${amt}</span></div><p style="margin-top:12px"><span class="badge">${participant.planType || 'NDIS Funded'}</span></p>`); },
+              }, 'Download Receipt'),
               React.createElement(Button, { variant: 'secondary', size: 'sm', onClick: () => setReceiptBooking(null) }, 'Close'),
             ),
           ),
         ),
       ),
+    );
+  }
+
+  // ── My Requests Tab ──
+  if (tab === 'my-requests') {
+    const myLeads = state.leads.filter(l => l.participantId === participant.id);
+    const acceptedLeads = myLeads.filter(l => l.status === 'unlocked');
+    const pendingLeads = myLeads.filter(l => l.status === 'new');
+
+    return React.createElement('div', { style: { padding: responsive.isMobile ? '20px 16px' : '24px 32px' } },
+      React.createElement('h2', { style: { fontSize: FONT_SIZES['2xl'], fontWeight: 800, color: c.text, marginBottom: '8px' } }, 'My Requests'),
+      React.createElement('p', { style: { color: c.textSecondary, marginBottom: '24px' } }, 'Track the support requests you have submitted to providers.'),
+
+      // Stats
+      React.createElement('div', { style: { display: 'grid', gridTemplateColumns: responsive.isMobile ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)', gap: '16px', marginBottom: '24px' } },
+        React.createElement(StatCard, { icon: Icons.users(20, COLORS.primary[500]), label: 'Total Requests', value: myLeads.length }),
+        React.createElement(StatCard, { icon: Icons.check(20, COLORS.success), label: 'Accepted', value: acceptedLeads.length }),
+        React.createElement(StatCard, { icon: Icons.clock(20, COLORS.warning), label: 'Pending', value: pendingLeads.length }),
+      ),
+
+      // Lead cards
+      myLeads.length === 0 ? React.createElement(EmptyState, { icon: Icons.users(48, c.textMuted), title: 'No requests yet', description: 'When you submit support requests to providers, they will appear here.' }) :
+      myLeads.map(lead => {
+        const prov = state.providers.find(p => p.id === lead.providerId);
+        return React.createElement(Card, { key: lead.id, style: { marginBottom: '16px' } },
+          // Success banner for unlocked
+          lead.status === 'unlocked' && React.createElement('div', {
+            style: { padding: '10px 14px', marginBottom: '12px', borderRadius: RADIUS.md, background: `${COLORS.success}10`, border: `1px solid ${COLORS.success}30`, display: 'flex', alignItems: 'center', gap: '8px' },
+          },
+            Icons.check(16, COLORS.success),
+            React.createElement('span', { style: { fontSize: FONT_SIZES.sm, fontWeight: 600, color: COLORS.success } }, 'A provider accepted your request!'),
+          ),
+          React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', flexWrap: 'wrap' } },
+            React.createElement('div', { style: { flex: 1, minWidth: '200px' } },
+              React.createElement('div', { style: { display: 'flex', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' } },
+                prov && React.createElement('span', { style: { fontSize: FONT_SIZES.base, fontWeight: 700, color: c.text } }, prov.name),
+                lead.category && React.createElement(Badge, { variant: 'info', size: 'xs' }, lead.category),
+                lead.participantSuburb && React.createElement(Badge, { size: 'xs' }, Icons.mapPin(12), ' ', lead.participantSuburb),
+                React.createElement(Badge, {
+                  variant: lead.status === 'new' ? 'warning' : lead.status === 'unlocked' ? 'success' : 'default', size: 'xs',
+                }, lead.status === 'new' ? 'Pending' : lead.status === 'unlocked' ? 'Accepted' : 'Declined'),
+              ),
+              lead.supportNeeds && React.createElement('p', { style: { fontSize: FONT_SIZES.sm, color: c.textSecondary, lineHeight: 1.6, marginBottom: '8px' } },
+                lead.supportNeeds.length > 120 ? lead.supportNeeds.slice(0, 120) + '...' : lead.supportNeeds),
+              React.createElement('p', { style: { fontSize: FONT_SIZES.xs, color: c.textMuted } },
+                lead.createdAt ? 'Submitted ' + new Date(lead.createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : ''),
+            ),
+            React.createElement('div', { style: { display: 'flex', gap: '8px', flexShrink: 0 } },
+              lead.status === 'unlocked' && lead.enquiryId && React.createElement(Button, {
+                variant: 'primary', size: 'sm',
+                onClick: () => {
+                  setPSelectedId(lead.enquiryId);
+                  dispatch({ type: ACTION_TYPES.SET_DASHBOARD_TAB, payload: 'enquiries' });
+                },
+                icon: Icons.mail(14),
+              }, 'View Conversation'),
+            ),
+          ),
+        );
+      }),
     );
   }
 
@@ -5317,15 +5784,19 @@ function AdminDashboard() {
     { name: 'Starter', value: freeCount, color: COLORS.accent[500] },
   ];
 
+  const leadRevenue = state.leads.filter(l => l.status === 'unlocked').length * 25;
+  const totalRevenue = mrr + leadRevenue;
+
   // ── Overview ──
   if (tab === 'overview') return React.createElement('div', { style: { padding: responsive.isMobile ? '20px 16px' : '24px 32px' } },
     React.createElement('h2', { style: { fontSize: FONT_SIZES['2xl'], fontWeight: 800, color: c.text, marginBottom: '24px' } }, 'Admin Dashboard'),
 
-    React.createElement('div', { style: { display: 'grid', gridTemplateColumns: responsive.isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' } },
+    React.createElement('div', { style: { display: 'grid', gridTemplateColumns: responsive.isMobile ? 'repeat(2, 1fr)' : 'repeat(5, 1fr)', gap: '16px', marginBottom: '24px' } },
       React.createElement(StatCard, { icon: Icons.briefcase(20, COLORS.primary[500]), label: 'Total Providers', value: totalProviders, change: 12, trend: 'up' }),
       React.createElement(StatCard, { icon: Icons.users(20, COLORS.accent[500]), label: 'Total Participants', value: totalParticipants, change: 18, trend: 'up' }),
-      React.createElement(StatCard, { icon: Icons.dollarSign(20, COLORS.success), label: 'Monthly Revenue', value: `$${mrr.toLocaleString()}`, change: 15, trend: 'up' }),
+      React.createElement(StatCard, { icon: Icons.dollarSign(20, COLORS.success), label: 'Monthly Revenue', value: `$${totalRevenue.toLocaleString()}`, change: 15, trend: 'up' }),
       React.createElement(StatCard, { icon: Icons.trendingUp(20, COLORS.primary[400]), label: 'Active Subs', value: eliteCount + premiumCount + proCount, change: 8, trend: 'up' }),
+      React.createElement(StatCard, { icon: Icons.dollarSign(20, COLORS.accent[400]), label: 'Lead Revenue', value: `$${leadRevenue.toLocaleString()}`, onClick: () => dispatch({type:ACTION_TYPES.SET_DASHBOARD_TAB,payload:'leads-admin'}) }),
     ),
 
     React.createElement('div', { style: { display: 'grid', gridTemplateColumns: responsive.isMobile ? '1fr' : 'repeat(2, 1fr)', gap: '24px' } },
@@ -5523,6 +5994,96 @@ function AdminDashboard() {
       ),
     ),
   );
+
+  // ── Admin Leads Tab ──
+  if (tab === 'leads-admin') {
+    const allLeads = state.leads;
+    const unlockedLeads = allLeads.filter(l => l.status === 'unlocked');
+    const declinedLeads = allLeads.filter(l => l.status === 'declined');
+    const newLeads = allLeads.filter(l => l.status === 'new');
+    const unlockRate = allLeads.length > 0 ? Math.round((unlockedLeads.length / allLeads.length) * 100) : 0;
+    const leadRevenue = unlockedLeads.length * 25;
+    const uniqueProviders = [...new Set(allLeads.map(l => l.providerId))].length;
+    const avgLeadsPerProvider = uniqueProviders > 0 ? Math.round(allLeads.length / uniqueProviders * 10) / 10 : 0;
+
+    const leadStatusData = [
+      { name: 'New', value: newLeads.length, color: COLORS.warning },
+      { name: 'Unlocked', value: unlockedLeads.length, color: COLORS.success },
+      { name: 'Declined', value: declinedLeads.length, color: COLORS.error },
+    ];
+
+    const leadRevenueData = ANALYTICS_MONTHS.map((m, i) => ({
+      month: m,
+      revenue: Math.floor(leadRevenue * (0.4 + i * 0.1 + Math.random() * 0.1)),
+    }));
+
+    return React.createElement('div', { style: { padding: responsive.isMobile ? '20px 16px' : '24px 32px' } },
+      React.createElement('h2', { style: { fontSize: FONT_SIZES['2xl'], fontWeight: 800, color: c.text, marginBottom: '24px' } }, 'Leads'),
+
+      // Stats
+      React.createElement('div', { style: { display: 'grid', gridTemplateColumns: responsive.isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' } },
+        React.createElement(StatCard, { icon: Icons.users(20, COLORS.primary[500]), label: 'Total Leads', value: allLeads.length }),
+        React.createElement(StatCard, { icon: Icons.trendingUp(20, COLORS.success), label: 'Unlock Rate', value: `${unlockRate}%` }),
+        React.createElement(StatCard, { icon: Icons.dollarSign(20, COLORS.accent[500]), label: 'Lead Revenue', value: `$${leadRevenue.toLocaleString()}` }),
+        React.createElement(StatCard, { icon: Icons.barChart(20, COLORS.primary[400]), label: 'Avg Leads/Provider', value: avgLeadsPerProvider }),
+      ),
+
+      // Charts
+      React.createElement('div', { style: { display: 'grid', gridTemplateColumns: responsive.isMobile ? '1fr' : 'repeat(2, 1fr)', gap: '24px', marginBottom: '24px' } },
+        React.createElement(Card, null,
+          React.createElement('h3', { style: { fontSize: FONT_SIZES.base, fontWeight: 700, color: c.text, marginBottom: '16px' } }, 'Lead Revenue Trend'),
+          React.createElement(ResponsiveContainer, { width: '100%', height: 250 },
+            React.createElement(AreaChart, { data: leadRevenueData },
+              React.createElement(CartesianGrid, { strokeDasharray: '3 3', stroke: c.border }),
+              React.createElement(XAxis, { dataKey: 'month', stroke: c.textMuted, fontSize: 12 }),
+              React.createElement(YAxis, { stroke: c.textMuted, fontSize: 12 }),
+              React.createElement(Tooltip, { contentStyle: { background: c.surface, border: `1px solid ${c.border}`, borderRadius: RADIUS.md }, formatter: (v) => `$${v}` }),
+              React.createElement(Area, { type: 'monotone', dataKey: 'revenue', stroke: COLORS.success, fill: `${COLORS.success}20`, strokeWidth: 2 }),
+            ),
+          ),
+        ),
+        React.createElement(Card, null,
+          React.createElement('h3', { style: { fontSize: FONT_SIZES.base, fontWeight: 700, color: c.text, marginBottom: '16px' } }, 'Lead Status Distribution'),
+          React.createElement(ResponsiveContainer, { width: '100%', height: 250 },
+            React.createElement(PieChart, null,
+              React.createElement(Pie, { data: leadStatusData, dataKey: 'value', nameKey: 'name', cx: '50%', cy: '50%', outerRadius: 80, label: ({name,value}) => `${name}: ${value}` },
+                leadStatusData.map((d, i) => React.createElement(Cell, { key: i, fill: d.color })),
+              ),
+              React.createElement(Tooltip),
+            ),
+          ),
+        ),
+      ),
+
+      // All Leads Table
+      React.createElement(Card, { style: { overflow: 'auto' } },
+        React.createElement('h3', { style: { fontSize: FONT_SIZES.base, fontWeight: 700, color: c.text, marginBottom: '16px' } }, 'All Leads'),
+        React.createElement('table', { style: { width: '100%', borderCollapse: 'collapse' } },
+          React.createElement('thead', null,
+            React.createElement('tr', null,
+              ['Provider','Participant','Category','Status','Amount','Date'].map(h => React.createElement('th', { key: h, style: { textAlign: 'left', padding: '10px 12px', fontSize: FONT_SIZES.xs, fontWeight: 700, color: c.textMuted, textTransform: 'uppercase', borderBottom: `1px solid ${c.border}` } }, h)),
+            ),
+          ),
+          React.createElement('tbody', null,
+            allLeads.slice(0, 50).map(lead => {
+              const prov = state.providers.find(p => p.id === lead.providerId);
+              return React.createElement('tr', { key: lead.id },
+                React.createElement('td', { style: { padding: '10px 12px', borderBottom: `1px solid ${c.border}`, fontSize: FONT_SIZES.sm, color: c.text } }, prov?.name || 'Unknown'),
+                React.createElement('td', { style: { padding: '10px 12px', borderBottom: `1px solid ${c.border}`, fontSize: FONT_SIZES.sm, color: c.textSecondary } }, lead.participantName || 'Unknown'),
+                React.createElement('td', { style: { padding: '10px 12px', borderBottom: `1px solid ${c.border}` } }, React.createElement(Badge, { size: 'xs' }, lead.category || '-')),
+                React.createElement('td', { style: { padding: '10px 12px', borderBottom: `1px solid ${c.border}` } },
+                  React.createElement(Badge, { variant: lead.status === 'new' ? 'warning' : lead.status === 'unlocked' ? 'success' : 'error', size: 'xs' }, lead.status.charAt(0).toUpperCase() + lead.status.slice(1)),
+                ),
+                React.createElement('td', { style: { padding: '10px 12px', borderBottom: `1px solid ${c.border}`, fontSize: FONT_SIZES.sm, fontWeight: 600, color: c.text } }, lead.status === 'unlocked' ? '$25' : '-'),
+                React.createElement('td', { style: { padding: '10px 12px', borderBottom: `1px solid ${c.border}`, fontSize: FONT_SIZES.sm, color: c.textMuted } }, lead.createdAt ? new Date(lead.createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) : '-'),
+              );
+            }),
+          ),
+        ),
+        allLeads.length === 0 && React.createElement('p', { style: { color: c.textMuted, fontSize: FONT_SIZES.sm, textAlign: 'center', padding: '24px' } }, 'No leads submitted yet.'),
+      ),
+    );
+  }
 
   // ── Reports Tab ──
   if (tab === 'reports') {
@@ -6134,6 +6695,26 @@ function App() {
             if (dbLeads) dispatch({ type: ACTION_TYPES.SET_DB_LEADS, payload: dbLeads });
           }
         }
+        // Load leads for logged-in participant
+        if (savedUser?.role === 'participant') {
+          const participantRec = await db.fetchParticipant(savedUser.id);
+          if (participantRec) {
+            const dbLeads = await db.fetchLeadsByParticipant(participantRec.id);
+            if (dbLeads) dispatch({ type: ACTION_TYPES.SET_DB_PARTICIPANT_LEADS, payload: dbLeads });
+          }
+        }
+        // Load all leads for admin
+        if (savedUser?.role === 'admin') {
+          // Admin fetches all leads — use provider-specific fetch for each provider
+          const allLeads = [];
+          if (dbProviders) {
+            for (const prov of dbProviders) {
+              const provLeads = await db.fetchLeads(prov.id);
+              if (provLeads) allLeads.push(...provLeads);
+            }
+          }
+          if (allLeads.length > 0) dispatch({ type: ACTION_TYPES.SET_DB_LEADS, payload: allLeads });
+        }
         // Load notifications for logged-in user
         if (savedUser?.id) {
           const dbNotifs = await db.fetchNotifications(savedUser.id);
@@ -6244,6 +6825,7 @@ function App() {
   return React.createElement(ThemeContext.Provider, { value: { theme: themeState, toggle: toggleTheme } },
     React.createElement(AppContext.Provider, { value: { state: { ...state, theme: themeState }, dispatch } },
       React.createElement(ToastProvider, null,
+        React.createElement(RealtimeListener),
         React.createElement(ErrorBoundary, null,
           React.createElement(PageShell, null,
             React.createElement(AppRouter),

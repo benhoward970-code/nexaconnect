@@ -191,6 +191,9 @@ create table if not exists leads (
   status text default 'new' check (status in ('new', 'unlocked', 'declined')),
   unlock_price integer default 2500,
   payment_intent_id text,
+  enquiry_id uuid references enquiries(id),
+  unlocked_at timestamptz,
+  first_response_at timestamptz,
   created_at timestamptz default now()
 );
 
@@ -225,3 +228,16 @@ alter table notifications enable row level security;
 
 create policy "Users can read own notifications" on notifications for select using (auth.uid() = user_id);
 create policy "Users can update own notifications" on notifications for update using (auth.uid() = user_id);
+
+-- ── Phase 4: Lead Lifecycle Columns (migration for existing databases) ──
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS enquiry_id uuid REFERENCES enquiries(id);
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS unlocked_at timestamptz;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS first_response_at timestamptz;
+
+-- ── Phase 5: Provider Page Customization Columns ──
+ALTER TABLE providers ADD COLUMN IF NOT EXISTS cover_photo text;
+ALTER TABLE providers ADD COLUMN IF NOT EXISTS brand_color text;
+ALTER TABLE providers ADD COLUMN IF NOT EXISTS cta_text text DEFAULT 'Get in Touch';
+ALTER TABLE providers ADD COLUMN IF NOT EXISTS video_url text;
+ALTER TABLE providers ADD COLUMN IF NOT EXISTS featured_services text[] DEFAULT '{}';
+ALTER TABLE providers ADD COLUMN IF NOT EXISTS gallery_layout text DEFAULT 'grid';

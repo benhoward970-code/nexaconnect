@@ -42,6 +42,12 @@ function snakeToCamel(row) {
     bookingsThisMonth: row.bookings_this_month || 0,
     stripeCustomerId: row.stripe_customer_id,
     stripeSubscriptionId: row.stripe_subscription_id,
+    coverPhoto: row.cover_photo || '',
+    brandColor: row.brand_color || '',
+    ctaText: row.cta_text || 'Get in Touch',
+    videoUrl: row.video_url || '',
+    featuredServices: row.featured_services || [],
+    galleryLayout: row.gallery_layout || 'grid',
     createdAt: row.created_at,
   };
 }
@@ -62,6 +68,12 @@ function camelToSnake(data) {
     bookingsThisMonth: 'bookings_this_month',
     stripeCustomerId: 'stripe_customer_id',
     stripeSubscriptionId: 'stripe_subscription_id',
+    coverPhoto: 'cover_photo',
+    brandColor: 'brand_color',
+    ctaText: 'cta_text',
+    videoUrl: 'video_url',
+    featuredServices: 'featured_services',
+    galleryLayout: 'gallery_layout',
     createdAt: 'created_at',
   };
   const result = {};
@@ -371,6 +383,9 @@ function snakeToLead(row) {
     status: row.status || 'new',
     unlockPrice: row.unlock_price || 2500,
     paymentIntentId: row.payment_intent_id,
+    enquiryId: row.enquiry_id || null,
+    unlockedAt: row.unlocked_at || null,
+    firstResponseAt: row.first_response_at || null,
     createdAt: row.created_at,
   };
 }
@@ -404,6 +419,38 @@ export async function declineLead(leadId) {
   if (!isSupabaseConfigured()) return null;
   const { error } = await supabase.from('leads').update({ status: 'declined' }).eq('id', leadId);
   if (error) { console.error('declineLead:', error); return null; }
+  return true;
+}
+
+export async function fetchLeadsByParticipant(participantId) {
+  if (!isSupabaseConfigured()) return null;
+  const { data, error } = await supabase.from('leads').select('*').eq('participant_id', participantId).order('created_at', { ascending: false });
+  if (error) { console.error('fetchLeadsByParticipant:', error); return null; }
+  return data.map(snakeToLead);
+}
+
+export async function linkLeadEnquiry(leadId, enquiryId) {
+  if (!isSupabaseConfigured()) return null;
+  const { error } = await supabase.from('leads').update({ enquiry_id: enquiryId }).eq('id', leadId);
+  if (error) { console.error('linkLeadEnquiry:', error); return null; }
+  return true;
+}
+
+export async function setLeadFirstResponse(leadId) {
+  if (!isSupabaseConfigured()) return null;
+  const { error } = await supabase.from('leads').update({ first_response_at: new Date().toISOString() }).eq('id', leadId).is('first_response_at', null);
+  if (error) { console.error('setLeadFirstResponse:', error); return null; }
+  return true;
+}
+
+export async function unlockLeadRecord(leadId, paymentIntentId) {
+  if (!isSupabaseConfigured()) return null;
+  const { error } = await supabase.from('leads').update({
+    status: 'unlocked',
+    unlocked_at: new Date().toISOString(),
+    payment_intent_id: paymentIntentId,
+  }).eq('id', leadId);
+  if (error) { console.error('unlockLeadRecord:', error); return null; }
   return true;
 }
 
