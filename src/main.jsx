@@ -1,5 +1,6 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
+import { Analytics } from '@vercel/analytics/react'
 import App from './App.jsx'
 
 // Global error handler to catch errors outside React's error boundary
@@ -22,5 +23,8 @@ errorDiv.style.cssText = 'display:none;position:fixed;top:20px;left:20px;right:2
 document.body.appendChild(errorDiv);
 
 createRoot(document.getElementById('root')).render(
-  <App />,
+  <>
+    <App />
+    <Analytics />
+  </>,
 )

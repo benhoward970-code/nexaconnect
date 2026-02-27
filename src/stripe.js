@@ -44,7 +44,17 @@ export async function redirectToCheckout({ providerId, priceId, planName, billin
     },
   });
 
-  if (error) throw error;
+  if (error) {
+    // Extract the actual error message from FunctionsHttpError
+    let msg = error.message || 'Unknown error';
+    if (error.context && typeof error.context.json === 'function') {
+      try { const body = await error.context.json(); msg = body.error || msg; } catch (_) {}
+    }
+    throw new Error(msg);
+  }
+  if (data?.error) {
+    throw new Error(data.error);
+  }
   if (data?.url) {
     window.location.href = data.url;
   } else {
@@ -74,7 +84,16 @@ export async function openBillingPortal(providerId) {
     },
   });
 
-  if (error) throw error;
+  if (error) {
+    let msg = error.message || 'Unknown error';
+    if (error.context && typeof error.context.json === 'function') {
+      try { const body = await error.context.json(); msg = body.error || msg; } catch (_) {}
+    }
+    throw new Error(msg);
+  }
+  if (data?.error) {
+    throw new Error(data.error);
+  }
   if (data?.url) {
     window.location.href = data.url;
   } else {
