@@ -27,7 +27,7 @@ const COLORS = {
     glass: 'rgba(17,24,39,0.8)',
     glassBorder: 'rgba(255,255,255,0.06)',
     overlay: 'rgba(0,0,0,0.6)',
-    cardShadow: '0 8px 32px rgba(0,0,0,0.4)',
+    cardShadow: '0 1px 3px rgba(0,0,0,0.2), 0 4px 16px rgba(0,0,0,0.15)',
     navBg: 'rgba(11,15,26,0.9)',
   },
   light: {
@@ -43,7 +43,7 @@ const COLORS = {
     glass: 'rgba(255,255,255,0.9)',
     glassBorder: 'rgba(0,0,0,0.04)',
     overlay: 'rgba(0,0,0,0.4)',
-    cardShadow: '0 1px 3px rgba(0,0,0,0.04), 0 4px 24px rgba(0,0,0,0.06)',
+    cardShadow: '0 1px 2px rgba(0,0,0,0.03), 0 2px 8px rgba(0,0,0,0.04)',
     navBg: 'rgba(255,255,255,0.92)',
   },
   primary: {
@@ -82,8 +82,13 @@ const FONT_SIZES = {
 };
 
 // ── Spacing / Radius ──
-const RADIUS = { sm: '6px', md: '10px', lg: '14px', xl: '20px', full: '9999px' };
-const SPACING = { xs: '4px', sm: '8px', md: '16px', lg: '24px', xl: '32px', '2xl': '48px', '3xl': '64px' };
+const RADIUS = { sm: '6px', md: '10px', lg: '14px', xl: '20px', '2xl': '24px', full: '9999px' };
+const SPACING = { xs: '4px', sm: '8px', md: '12px', base: '16px', lg: '20px', xl: '24px', '2xl': '32px', '3xl': '48px', '4xl': '64px', '5xl': '80px', '6xl': '100px' };
+
+// ── Section Padding (consistent vertical rhythm) ──
+const SECTION_PAD = { mobile: '48px 20px', tablet: '64px 32px', desktop: '100px 40px' };
+const SECTION_PAD_SM = { mobile: '32px 20px', tablet: '48px 32px', desktop: '64px 40px' };
+const CONTAINER = { sm: '640px', md: '800px', lg: '1000px', xl: '1200px' };
 
 // ── Breakpoints ──
 const BREAKPOINTS = { sm: 640, md: 768, lg: 1024, xl: 1280 };
@@ -183,10 +188,14 @@ function injectStyles() {
     ::selection { background: rgba(59,130,246,0.3); color: inherit; }
 
     input, textarea, select { font-family: ${FONTS.sans}; }
-    * { scrollbar-width: thin; scrollbar-color: rgba(59,130,246,0.3) transparent; }
+    * { scrollbar-width: thin; scrollbar-color: rgba(59,130,246,0.3) transparent; box-sizing: border-box; }
+    body { line-height: 1.5; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+    h1, h2, h3, h4, h5, h6 { line-height: 1.3; }
+    p { line-height: 1.6; }
+    button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid ${COLORS.primary[500]}; outline-offset: 2px; }
 
-    .nc-glass-hover:hover { border-color: rgba(59,130,246,0.3) !important; box-shadow: 0 8px 32px rgba(59,130,246,0.15) !important; }
-    .nc-card-hover:hover { transform: translateY(-2px); box-shadow: 0 12px 40px rgba(59,130,246,0.2) !important; }
+    .nc-glass-hover:hover { border-color: rgba(59,130,246,0.2) !important; box-shadow: 0 4px 16px rgba(59,130,246,0.08) !important; }
+    .nc-card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.08) !important; border-color: rgba(59,130,246,0.15) !important; }
   `;
   document.head.appendChild(style);
 }
@@ -264,19 +273,20 @@ function Button({ children, onClick, variant = 'primary', size = 'md', disabled,
   const { theme } = useTheme();
   const c = COLORS[theme];
   const base = {
-    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: SPACING.sm,
     fontFamily: FONTS.sans, fontWeight: 600, cursor: disabled ? 'not-allowed' : 'pointer',
-    border: 'none', borderRadius: RADIUS.md, transition: 'all 0.25s ease',
+    border: 'none', borderRadius: RADIUS.md, transition: 'all 0.2s ease',
     opacity: disabled ? 0.5 : 1, width: fullWidth ? '100%' : undefined,
-    fontSize: size === 'sm' ? FONT_SIZES.sm : size === 'lg' ? FONT_SIZES.md : FONT_SIZES.base,
-    padding: size === 'sm' ? '8px 16px' : size === 'lg' ? '14px 28px' : '10px 22px',
-    letterSpacing: '-0.01em',
+    fontSize: size === 'sm' ? FONT_SIZES.sm : size === 'lg' ? FONT_SIZES.md : FONT_SIZES.sm,
+    padding: size === 'sm' ? '8px 14px' : size === 'lg' ? '14px 28px' : '10px 20px',
+    letterSpacing: '0',
+    lineHeight: 1.5,
   };
   const variants = {
-    primary: { background: COLORS.primary[600], color: '#fff', boxShadow: '0 4px 15px rgba(59,130,246,0.3)' },
+    primary: { background: COLORS.primary[600], color: '#fff', boxShadow: '0 1px 3px rgba(37,99,235,0.3)' },
     secondary: { background: c.surface, color: c.text, border: `1px solid ${c.border}` },
     ghost: { background: 'transparent', color: c.textSecondary },
-    accent: { background: COLORS.gradientAccent, color: '#fff', boxShadow: '0 4px 15px rgba(249,115,22,0.3)' },
+    accent: { background: COLORS.gradientAccent, color: '#fff', boxShadow: '0 1px 3px rgba(249,115,22,0.3)' },
     danger: { background: COLORS.error, color: '#fff' },
     outline: { background: 'transparent', color: COLORS.primary[500], border: `1.5px solid ${c.border}` },
   };
@@ -309,10 +319,10 @@ function Badge({ children, variant = 'default', size = 'sm', style: sx }) {
   return React.createElement('span', {
     style: {
       display: 'inline-flex', alignItems: 'center', gap: '4px',
-      padding: size === 'xs' ? '2px 8px' : '4px 12px',
-      borderRadius: RADIUS.full, fontWeight: 600,
+      padding: size === 'xs' ? '3px 8px' : '4px 12px',
+      borderRadius: RADIUS.full, fontWeight: 500,
       fontSize: size === 'xs' ? FONT_SIZES.xs : FONT_SIZES.sm,
-      fontFamily: FONTS.sans, letterSpacing: '0.02em',
+      fontFamily: FONTS.sans, letterSpacing: '0.01em', lineHeight: 1.4,
       ...variants[variant], ...sx,
     },
   }, children);
@@ -335,13 +345,14 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-function Card({ children, onClick, hover, glass, style: sx, className }) {
+function Card({ children, onClick, hover, glass, compact, style: sx, className }) {
   const { theme } = useTheme();
   const base = glass ? glassStyle(theme) : cardStyle(theme);
+  const pad = compact ? SPACING.base : SPACING.xl;
   return React.createElement('div', {
     onClick,
     className: `${hover ? 'nc-card-hover' : ''} ${className || ''}`,
-    style: { ...base, padding: SPACING.lg, cursor: onClick ? 'pointer' : undefined, ...sx },
+    style: { ...base, padding: pad, cursor: onClick ? 'pointer' : undefined, ...sx },
   }, children);
 }
 
@@ -350,13 +361,13 @@ function Input({ label, value, onChange, type = 'text', placeholder, icon, error
   const c = COLORS[theme];
   const [focused, setFocused] = useState(false);
   const El = textarea ? 'textarea' : 'input';
-  return React.createElement('div', { style: { marginBottom: '16px', ...sx } },
+  return React.createElement('div', { style: { marginBottom: SPACING.lg, ...sx } },
     label && React.createElement('label', {
-      style: { display: 'block', marginBottom: '6px', fontSize: FONT_SIZES.sm, fontWeight: 600, color: c.text, fontFamily: FONTS.sans },
+      style: { display: 'block', marginBottom: SPACING.sm, fontSize: FONT_SIZES.sm, fontWeight: 500, color: c.text, fontFamily: FONTS.sans },
     }, label),
     React.createElement('div', { style: { position: 'relative' } },
       icon && React.createElement('span', {
-        style: { position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: c.textMuted },
+        style: { position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: c.textMuted },
       }, icon),
       React.createElement(El, {
         type, value, placeholder,
@@ -364,32 +375,32 @@ function Input({ label, value, onChange, type = 'text', placeholder, icon, error
         onFocus: () => setFocused(true),
         onBlur: () => setFocused(false),
         style: {
-          width: '100%', padding: icon ? '10px 14px 10px 40px' : '10px 14px',
-          background: c.surface, color: c.text, border: `1.5px solid ${focused ? COLORS.primary[500] : error ? COLORS.error : c.border}`,
-          borderRadius: RADIUS.md, fontSize: FONT_SIZES.base, fontFamily: FONTS.sans,
-          outline: 'none', transition: 'border-color 0.2s', resize: textarea ? 'vertical' : undefined,
-          minHeight: textarea ? '100px' : undefined,
-          boxShadow: focused ? `0 0 0 3px ${COLORS.primary[500]}20` : 'none',
+          width: '100%', padding: icon ? '11px 14px 11px 42px' : '11px 14px',
+          background: c.surface, color: c.text, border: `1px solid ${focused ? COLORS.primary[500] : error ? COLORS.error : c.border}`,
+          borderRadius: RADIUS.md, fontSize: FONT_SIZES.sm, fontFamily: FONTS.sans,
+          outline: 'none', transition: 'border-color 0.2s, box-shadow 0.2s', resize: textarea ? 'vertical' : undefined,
+          minHeight: textarea ? '100px' : undefined, lineHeight: 1.5,
+          boxShadow: focused ? `0 0 0 3px ${COLORS.primary[500]}15` : 'none',
         },
         ...props,
       }),
     ),
-    error && React.createElement('p', { style: { color: COLORS.error, fontSize: FONT_SIZES.xs, marginTop: '4px' } }, error),
+    error && React.createElement('p', { style: { color: COLORS.error, fontSize: FONT_SIZES.xs, marginTop: SPACING.xs } }, error),
   );
 }
 
 function Select({ label, value, onChange, options, style: sx }) {
   const { theme } = useTheme();
   const c = COLORS[theme];
-  return React.createElement('div', { style: { marginBottom: '16px', ...sx } },
+  return React.createElement('div', { style: { marginBottom: SPACING.lg, ...sx } },
     label && React.createElement('label', {
-      style: { display: 'block', marginBottom: '6px', fontSize: FONT_SIZES.sm, fontWeight: 600, color: c.text },
+      style: { display: 'block', marginBottom: SPACING.sm, fontSize: FONT_SIZES.sm, fontWeight: 500, color: c.text },
     }, label),
     React.createElement('select', {
       value, onChange: (e) => onChange && onChange(e.target.value),
       style: {
-        width: '100%', padding: '10px 14px', background: c.surface, color: c.text,
-        border: `1.5px solid ${c.border}`, borderRadius: RADIUS.md, fontSize: FONT_SIZES.base,
+        width: '100%', padding: '11px 14px', background: c.surface, color: c.text,
+        border: `1px solid ${c.border}`, borderRadius: RADIUS.md, fontSize: FONT_SIZES.sm,
         fontFamily: FONTS.sans, outline: 'none', cursor: 'pointer', appearance: 'none',
         backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
         backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center',
@@ -448,16 +459,17 @@ function Modal({ open, onClose, title, children, width = '500px' }) {
     React.createElement('div', {
       onClick: (e) => e.stopPropagation(),
       style: {
-        ...glassStyle(theme), width, maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto',
-        padding: SPACING.xl, animation: 'nc-scaleIn 0.3s ease', background: c.surface,
+        ...glassStyle(theme), width, maxWidth: '92vw', maxHeight: '85vh', overflowY: 'auto',
+        padding: SPACING['2xl'], animation: 'nc-scaleIn 0.25s ease', background: c.surface,
+        borderRadius: RADIUS.xl,
       },
     },
-      React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.lg } },
-        React.createElement('h3', { style: { fontSize: FONT_SIZES.xl, fontWeight: 700, color: c.text } }, title),
+      React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.xl } },
+        React.createElement('h3', { style: { fontSize: FONT_SIZES.lg, fontWeight: 600, color: c.text } }, title),
         React.createElement('button', {
           onClick: onClose,
-          style: { background: 'none', border: 'none', cursor: 'pointer', color: c.textMuted, padding: '4px' },
-        }, Icons.x()),
+          style: { background: 'none', border: 'none', cursor: 'pointer', color: c.textMuted, padding: SPACING.sm, borderRadius: RADIUS.sm },
+        }, Icons.x(18)),
       ),
       children,
     ),
@@ -598,28 +610,28 @@ function ProgressBar({ value, max = 100, height = 8, color, style: sx }) {
   );
 }
 
-function StatCard({ icon, label, value, change, trend, style: sx }) {
+function StatCard({ icon, label, value, change, trend, onClick, style: sx }) {
   const { theme } = useTheme();
   const c = COLORS[theme];
   const isPositive = trend === 'up';
-  return React.createElement(Card, { style: { ...sx } },
-    React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' } },
+  return React.createElement(Card, { style: { ...sx }, onClick },
+    React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: SPACING.base } },
       React.createElement('div', {
         style: {
-          width: 44, height: 44, borderRadius: RADIUS.md, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          width: 40, height: 40, borderRadius: RADIUS.md, display: 'flex', alignItems: 'center', justifyContent: 'center',
           background: COLORS.gradientCard,
         },
       }, icon),
       change != null && React.createElement('span', {
         style: {
-          fontSize: FONT_SIZES.xs, fontWeight: 600, padding: '3px 8px', borderRadius: RADIUS.full,
+          fontSize: FONT_SIZES.xs, fontWeight: 500, padding: '3px 8px', borderRadius: RADIUS.full,
           color: isPositive ? COLORS.success : COLORS.error,
-          background: isPositive ? `${COLORS.success}15` : `${COLORS.error}15`,
+          background: isPositive ? `${COLORS.success}10` : `${COLORS.error}10`,
         },
       }, `${isPositive ? '+' : ''}${change}%`),
     ),
-    React.createElement('p', { style: { fontSize: FONT_SIZES.sm, color: c.textSecondary, marginBottom: '4px' } }, label),
-    React.createElement('p', { style: { fontSize: FONT_SIZES['2xl'], fontWeight: 800, color: c.text } }, value),
+    React.createElement('p', { style: { fontSize: FONT_SIZES.xs, color: c.textMuted, marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 500 } }, label),
+    React.createElement('p', { style: { fontSize: FONT_SIZES.xl, fontWeight: 700, color: c.text } }, value),
   );
 }
 
@@ -2024,8 +2036,10 @@ function Navbar() {
 
   return React.createElement('nav', {
     style: {
-      position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100, padding: '0 28px',
-      height: '72px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
+      padding: responsive.isMobile ? '0 16px' : '0 32px',
+      height: responsive.isMobile ? '60px' : '64px',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       background: isMarketing ? c.navBg : c.surface,
       backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
       borderBottom: `1px solid ${c.border}`,
@@ -2033,7 +2047,7 @@ function Navbar() {
     },
   },
     // Left: Logo + mobile menu
-    React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '12px' } },
+    React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: SPACING.base } },
       isLoggedIn && !isMarketing && React.createElement('button', {
         onClick: () => responsive.isMobile ? dispatch({type:ACTION_TYPES.SET_MOBILE_SIDEBAR,payload:!state.mobileSidebarOpen}) : dispatch({type:ACTION_TYPES.SET_SIDEBAR_OPEN,payload:!state.sidebarOpen}),
         style: { background:'none',border:'none',cursor:'pointer',color:c.text,display:'flex',padding:'4px' },
@@ -2215,7 +2229,7 @@ function Sidebar() {
         key: item.key,
         onClick: () => dispatch({type:ACTION_TYPES.SET_DASHBOARD_TAB,payload:item.key}),
         style: {
-          width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px',
+          width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px',
           borderRadius: RADIUS.md, border: 'none', cursor: 'pointer', marginBottom: '2px',
           background: state.dashboardTab === item.key ? `${COLORS.primary[500]}15` : 'transparent',
           color: state.dashboardTab === item.key ? COLORS.primary[500] : c.textSecondary,
@@ -2233,7 +2247,7 @@ function Sidebar() {
       React.createElement('button', {
         onClick: () => dispatch({type:ACTION_TYPES.NAV_GOTO,payload:{route:'directory'}}),
         style: {
-          width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px',
+          width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px',
           borderRadius: RADIUS.md, border: 'none', cursor: 'pointer', marginBottom: '4px',
           background: 'transparent', color: c.textSecondary, fontFamily: FONTS.sans, fontSize: FONT_SIZES.sm, fontWeight: 600,
         },
@@ -2241,7 +2255,7 @@ function Sidebar() {
       React.createElement('button', {
         onClick: () => { if (isSupabaseConfigured()) supabase.auth.signOut(); dispatch({type:ACTION_TYPES.LOGOUT}); },
         style: {
-          width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px',
+          width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px',
           borderRadius: RADIUS.md, border: 'none', cursor: 'pointer',
           background: 'transparent', color: COLORS.error, fontFamily: FONTS.sans, fontSize: FONT_SIZES.sm, fontWeight: 600,
         },
@@ -2271,7 +2285,7 @@ function Footer() {
   return React.createElement('footer', {
     style: {
       background: c.surface, borderTop: `1px solid ${c.border}`,
-      padding: responsive.isMobile ? '40px 20px' : '60px 40px',
+      padding: responsive.isMobile ? '48px 20px' : '64px 40px',
     },
   },
     React.createElement('div', { style: { maxWidth: '1200px', margin: '0 auto' } },
@@ -2296,11 +2310,11 @@ function Footer() {
           { title: 'Support', links: [['Help Centre','help'],['Contact Us','contact'],['NDIS Resources','ndis-resources']] },
           { title: 'Company', links: [['About','about'],['Privacy Policy','privacy'],['Terms of Service','terms'],['NDIS Code of Conduct','ndis-code-of-conduct'],['Complaints','complaints']] },
         ].map((col, i) => React.createElement('div', { key: i },
-          React.createElement('h4', { style: { color: c.text, fontSize: FONT_SIZES.sm, fontWeight: 700, marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' } }, col.title),
+          React.createElement('h4', { style: { color: c.text, fontSize: FONT_SIZES.xs, fontWeight: 600, marginBottom: SPACING.base, textTransform: 'uppercase', letterSpacing: '0.06em' } }, col.title),
           ...col.links.map(([label, route], j) => React.createElement('button', {
             key: j,
             onClick: () => dispatch({type:ACTION_TYPES.NAV_GOTO,payload:{route}}),
-            style: { display: 'block', background: 'none', border: 'none', color: c.textSecondary, fontSize: FONT_SIZES.sm, cursor: 'pointer', padding: '4px 0', fontFamily: FONTS.sans },
+            style: { display: 'block', background: 'none', border: 'none', color: c.textSecondary, fontSize: FONT_SIZES.sm, cursor: 'pointer', padding: '5px 0', fontFamily: FONTS.sans, lineHeight: 1.5 },
           }, label)),
         )),
       ),
@@ -2329,8 +2343,8 @@ function PageShell({ children }) {
     showSidebar && React.createElement(Sidebar),
     React.createElement('main', {
       style: {
-        marginTop: '72px', marginLeft: sidebarWidth,
-        transition: 'margin-left 0.3s', minHeight: 'calc(100vh - 72px)',
+        marginTop: responsive.isMobile ? '60px' : '64px', marginLeft: sidebarWidth,
+        transition: 'margin-left 0.3s', minHeight: responsive.isMobile ? 'calc(100vh - 60px)' : 'calc(100vh - 64px)',
         animation: 'nc-fadeIn 0.4s ease',
       },
     }, children),
@@ -2376,9 +2390,9 @@ function LandingPage() {
     // Hero Section
     React.createElement('section', {
       style: {
-        position: 'relative', overflow: 'hidden', minHeight: responsive.isMobile ? '80vh' : '85vh',
+        position: 'relative', overflow: 'hidden', minHeight: responsive.isMobile ? '80vh' : '90vh',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: responsive.isMobile ? '100px 20px 40px' : '100px 40px',
+        padding: responsive.isMobile ? '80px 20px 48px' : '120px 40px 80px',
       },
     },
       // Background gradient
@@ -2391,14 +2405,14 @@ function LandingPage() {
       React.createElement('div', { style: { position: 'relative', maxWidth: '1200px', width: '100%', textAlign: 'center', zIndex: 1 } },
         React.createElement('div', { style: { animation: 'nc-fadeInUp 0.8s ease' } },
           // Editorial badge pill
-          React.createElement('div', { style: { display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 16px', borderRadius: '100px', background: theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', marginBottom: '24px', fontSize: FONT_SIZES.sm, color: c.textSecondary, fontWeight: 500 } },
+          React.createElement('div', { style: { display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 16px', borderRadius: '100px', background: theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', marginBottom: '32px', fontSize: FONT_SIZES.sm, color: c.textSecondary, fontWeight: 500 } },
             React.createElement('span', { style: { width: 8, height: 8, borderRadius: '50%', background: '#F97316', display: 'inline-block', animation: 'nc-pulse 2s ease-in-out infinite' } }),
             'Australia\'s NDIS Provider Marketplace',
           ),
           React.createElement('h1', {
             style: {
               fontSize: responsive.isMobile ? FONT_SIZES['3xl'] : FONT_SIZES['5xl'],
-              fontFamily: FONTS.display, fontWeight: 400, lineHeight: 1.15, letterSpacing: '-0.03em', marginBottom: '24px',
+              fontFamily: FONTS.display, fontWeight: 400, lineHeight: 1.1, letterSpacing: '-0.03em', marginBottom: '28px',
               color: c.text,
             },
           },
@@ -2408,10 +2422,10 @@ function LandingPage() {
           React.createElement('p', {
             style: {
               fontSize: responsive.isMobile ? FONT_SIZES.base : FONT_SIZES.lg, color: c.textSecondary,
-              maxWidth: '580px', margin: '0 auto 32px', lineHeight: 1.7,
+              maxWidth: '560px', margin: '0 auto 40px', lineHeight: 1.7,
             },
           }, 'Browse trusted providers, read real reviews, and connect for free. The smarter way to find disability support services.'),
-          React.createElement('div', { style: { display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' } },
+          React.createElement('div', { style: { display: 'flex', gap: SPACING.base, justifyContent: 'center', flexWrap: 'wrap' } },
             React.createElement(Button, {
               variant: 'primary', size: 'lg',
               onClick: () => dispatch({type:ACTION_TYPES.NAV_GOTO,payload:{route:'directory'}}),
@@ -2448,7 +2462,7 @@ function LandingPage() {
     ),
 
     // Features Grid
-    React.createElement('section', { style: { padding: responsive.isMobile ? '60px 20px' : '130px 40px' } },
+    React.createElement('section', { style: { padding: responsive.isMobile ? SECTION_PAD.mobile : SECTION_PAD.desktop } },
       React.createElement('div', { style: { maxWidth: '1200px', margin: '0 auto' } },
         React.createElement('div', { style: { textAlign: 'left', marginBottom: '48px', maxWidth: '500px' } },
           React.createElement('p', { style: { fontSize: FONT_SIZES.xs, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: COLORS.accent[500], marginBottom: '12px' } }, 'Platform'),
@@ -2466,10 +2480,10 @@ function LandingPage() {
             style: { animation: `nc-fadeInUp ${0.3 + i * 0.1}s ease forwards`, opacity: 0, cursor: 'pointer' },
           },
             React.createElement('div', {
-              style: { width: 48, height: 48, borderRadius: RADIUS.md, background: 'rgba(249,115,22,0.08)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px' },
-            }, f.icon(24, COLORS.accent[500])),
-            React.createElement('h3', { style: { fontSize: FONT_SIZES.lg, fontFamily: FONTS.display, fontWeight: 500, color: c.text, marginBottom: '8px' } }, f.title),
+              style: { width: 44, height: 44, borderRadius: RADIUS.md, background: 'rgba(249,115,22,0.06)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.lg },
+            }, f.icon(22, COLORS.accent[500])),
+            React.createElement('h3', { style: { fontSize: FONT_SIZES.base, fontFamily: FONTS.sans, fontWeight: 600, color: c.text, marginBottom: SPACING.sm } }, f.title),
             React.createElement('p', { style: { color: c.textSecondary, fontSize: FONT_SIZES.sm, lineHeight: 1.6 } }, f.desc),
           )),
         ),
@@ -2479,24 +2493,24 @@ function LandingPage() {
     // Featured Providers Carousel
     (() => {
       const featuredProviders = state.providers.filter(p => p.tier === 'premium' || p.tier === 'elite').slice(0, 6);
-      return featuredProviders.length > 0 ? React.createElement('section', { style: { padding: responsive.isMobile ? '40px 20px' : '80px 40px', background: c.surfaceAlt } },
+      return featuredProviders.length > 0 ? React.createElement('section', { style: { padding: responsive.isMobile ? SECTION_PAD.mobile : SECTION_PAD.desktop, background: c.surfaceAlt } },
         React.createElement('div', { style: { maxWidth: '1200px', margin: '0 auto' } },
           React.createElement('div', { style: { textAlign: 'center', marginBottom: '32px' } },
             React.createElement('h2', { style: { fontSize: responsive.isMobile ? FONT_SIZES['2xl'] : FONT_SIZES['3xl'], fontFamily: FONTS.display, fontWeight: 400, color: c.text, marginBottom: '8px' } }, 'Featured Providers'),
             React.createElement('p', { style: { color: c.textSecondary, fontSize: FONT_SIZES.md } }, 'Top-rated NDIS providers ready to support you'),
           ),
-          React.createElement('div', { style: { display: 'flex', gap: '16px', overflowX: 'auto', paddingBottom: '12px' } },
-            featuredProviders.map(fp => React.createElement('div', {
+          React.createElement('div', { style: { display: 'grid', gridTemplateColumns: responsive.isMobile ? 'repeat(2, 1fr)' : `repeat(${Math.min(featuredProviders.length, 4)}, 1fr)`, gap: SPACING.xl } },
+            featuredProviders.slice(0, 4).map(fp => React.createElement('div', {
               key: fp.id,
               onClick: () => { dispatch({type:ACTION_TYPES.SET_SELECTED_PROVIDER,payload:fp.id}); dispatch({type:ACTION_TYPES.NAV_GOTO,payload:{route:'provider-profile',params:{providerId:fp.id}}}); },
-              style: { minWidth: '220px', flex: '0 0 auto', padding: '20px', borderRadius: RADIUS.lg, border: `1px solid ${c.border}`, background: c.surface, cursor: 'pointer', textAlign: 'center', transition: 'all 0.2s' },
+              style: { padding: SPACING.xl, borderRadius: RADIUS.lg, border: `1px solid ${c.border}`, background: c.surface, cursor: 'pointer', textAlign: 'center', transition: 'all 0.2s' },
               onMouseEnter: (e) => { e.currentTarget.style.borderColor = COLORS.primary[500]; e.currentTarget.style.transform = 'translateY(-2px)'; },
               onMouseLeave: (e) => { e.currentTarget.style.borderColor = c.border; e.currentTarget.style.transform = 'translateY(0)'; },
             },
-              React.createElement(Avatar, { name: fp.name, size: 56, style: { margin: '0 auto 12px' } }),
-              React.createElement('h4', { style: { fontSize: FONT_SIZES.base, fontWeight: 700, color: c.text, marginBottom: '4px' } }, fp.name),
-              React.createElement(Badge, { variant: fp.tier, size: 'xs', style: { marginBottom: '8px' } }, fp.tier.charAt(0).toUpperCase() + fp.tier.slice(1)),
-              React.createElement('p', { style: { fontSize: FONT_SIZES.xs, color: c.textSecondary, lineHeight: 1.4, marginBottom: '8px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' } }, fp.shortDescription),
+              React.createElement(Avatar, { name: fp.name, size: 52, style: { margin: `0 auto ${SPACING.md}` } }),
+              React.createElement('h4', { style: { fontSize: FONT_SIZES.sm, fontWeight: 600, color: c.text, marginBottom: SPACING.xs } }, fp.name),
+              React.createElement(Badge, { variant: fp.tier, size: 'xs', style: { marginBottom: SPACING.sm } }, fp.tier.charAt(0).toUpperCase() + fp.tier.slice(1)),
+              React.createElement('p', { style: { fontSize: FONT_SIZES.xs, color: c.textSecondary, lineHeight: 1.5, marginBottom: SPACING.sm, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' } }, fp.shortDescription),
               React.createElement(StarRating, { rating: fp.rating, size: 12, showValue: true }),
             )),
           ),
@@ -2505,7 +2519,7 @@ function LandingPage() {
     })(),
 
     // How It Works
-    React.createElement('section', { style: { padding: responsive.isMobile ? '60px 20px' : '130px 40px', background: COLORS.primary[900], position: 'relative', overflow: 'hidden' } },
+    React.createElement('section', { style: { padding: responsive.isMobile ? SECTION_PAD.mobile : SECTION_PAD.desktop, background: COLORS.primary[900], position: 'relative', overflow: 'hidden' } },
       // Decorative orange radial gradient
       React.createElement('div', { style: { position: 'absolute', top: '-20%', right: '-10%', width: '500px', height: '500px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(249,115,22,0.15) 0%, transparent 70%)', pointerEvents: 'none' } }),
       React.createElement('div', { style: { maxWidth: '1000px', margin: '0 auto', position: 'relative', zIndex: 1 } },
@@ -2518,13 +2532,13 @@ function LandingPage() {
         },
           HOW_IT_WORKS.map((step, i) => React.createElement('div', {
             key: i, style: { textAlign: 'center', animation: `nc-fadeInUp ${0.4 + i * 0.15}s ease forwards`, opacity: 0,
-              background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: RADIUS.lg, padding: '32px 24px', backdropFilter: 'blur(10px)' },
+              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: RADIUS.lg, padding: SPACING['2xl'], backdropFilter: 'blur(10px)' },
           },
             React.createElement('div', {
               style: {
-                width: 56, height: 56, borderRadius: RADIUS.md, background: 'rgba(249,115,22,0.12)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px',
-                fontSize: FONT_SIZES.lg, fontWeight: 700, color: COLORS.accent[500],
+                width: 48, height: 48, borderRadius: RADIUS.md, background: 'rgba(249,115,22,0.1)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', margin: `0 auto ${SPACING.lg}`,
+                fontSize: FONT_SIZES.base, fontWeight: 700, color: COLORS.accent[500],
               },
             }, step.step),
             React.createElement('h3', { style: { fontSize: FONT_SIZES.lg, fontFamily: FONTS.display, fontWeight: 500, color: '#FFFFFF', marginBottom: '8px' } }, step.title),
@@ -2535,7 +2549,7 @@ function LandingPage() {
     ),
 
     // Category Showcase
-    React.createElement('section', { style: { padding: responsive.isMobile ? '60px 20px' : '130px 40px' } },
+    React.createElement('section', { style: { padding: responsive.isMobile ? SECTION_PAD.mobile : SECTION_PAD.desktop } },
       React.createElement('div', { style: { maxWidth: '1200px', margin: '0 auto' } },
         React.createElement('div', { style: { textAlign: 'left', marginBottom: '40px' } },
           React.createElement('p', { style: { fontSize: FONT_SIZES.xs, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: COLORS.accent[500], marginBottom: '12px' } }, 'Services'),
@@ -2559,7 +2573,7 @@ function LandingPage() {
     ),
 
     // Pricing CTA
-    React.createElement('section', { style: { padding: responsive.isMobile ? '60px 20px' : '130px 40px', background: c.surfaceAlt } },
+    React.createElement('section', { style: { padding: responsive.isMobile ? SECTION_PAD.mobile : SECTION_PAD.desktop, background: c.surfaceAlt } },
       React.createElement('div', { style: { maxWidth: '800px', margin: '0 auto', textAlign: 'center' } },
         React.createElement('h2', { style: { fontSize: responsive.isMobile ? FONT_SIZES['2xl'] : FONT_SIZES['3xl'], fontWeight: 800, color: c.text, marginBottom: '16px' } },
           'Ready to Grow Your Business?'),
@@ -2573,7 +2587,7 @@ function LandingPage() {
     ),
 
     // Testimonials
-    React.createElement('section', { style: { padding: responsive.isMobile ? '60px 20px' : '130px 40px' } },
+    React.createElement('section', { style: { padding: responsive.isMobile ? SECTION_PAD.mobile : SECTION_PAD.desktop } },
       React.createElement('div', { style: { maxWidth: '1000px', margin: '0 auto' } },
         React.createElement('div', { style: { textAlign: 'left', marginBottom: '40px' } },
           React.createElement('p', { style: { fontSize: FONT_SIZES.xs, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: COLORS.accent[500], marginBottom: '12px' } }, 'Testimonials'),
@@ -2601,13 +2615,13 @@ function LandingPage() {
     // Final CTA
     React.createElement('section', {
       style: {
-        padding: responsive.isMobile ? '40px 20px' : '60px 40px', textAlign: 'center',
+        padding: responsive.isMobile ? SECTION_PAD.mobile : SECTION_PAD.desktop, textAlign: 'center',
       },
     },
       React.createElement('div', {
         style: {
-          maxWidth: '1000px', margin: '0 auto', background: '#F97316', borderRadius: '24px',
-          padding: responsive.isMobile ? '48px 24px' : '80px 60px', position: 'relative', overflow: 'hidden',
+          maxWidth: CONTAINER.lg, margin: '0 auto', background: '#F97316', borderRadius: RADIUS.xl,
+          padding: responsive.isMobile ? '48px 24px' : '64px 48px', position: 'relative', overflow: 'hidden',
         },
       },
         // Decorative radial gradient overlay
@@ -2648,7 +2662,7 @@ function PricingPage() {
 
   return React.createElement(Fragment, null,
     React.createElement('section', {
-      style: { padding: responsive.isMobile ? '100px 20px 60px' : '120px 40px 80px', textAlign: 'center' },
+      style: { padding: responsive.isMobile ? '80px 20px 48px' : '48px 40px 64px', textAlign: 'center' },
     },
       React.createElement(Badge, { variant: 'default', style: { marginBottom: '16px' } }, 'Pricing'),
       React.createElement('h1', { style: { fontSize: responsive.isMobile ? FONT_SIZES['2xl'] : FONT_SIZES['4xl'], fontWeight: 900, color: c.text, marginBottom: '16px' } },
@@ -2657,7 +2671,7 @@ function PricingPage() {
         'Choose the plan that fits your business. Free for participants, always.'),
 
       // Billing toggle
-      React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginBottom: '48px' } },
+      React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: SPACING.base, marginBottom: SPACING['3xl'] } },
         React.createElement('span', { style: { fontSize: FONT_SIZES.sm, fontWeight: 600, color: state.billingCycle === 'monthly' ? c.text : c.textMuted } }, 'Monthly'),
         React.createElement(Toggle, {
           checked: state.billingCycle === 'annual',
@@ -2672,7 +2686,7 @@ function PricingPage() {
         style: {
           display: 'grid',
           gridTemplateColumns: responsive.isMobile ? '1fr' : responsive.isTablet ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
-          gap: '20px', maxWidth: '1200px', margin: '0 auto',
+          gap: SPACING.xl, maxWidth: CONTAINER.xl, margin: '0 auto',
         },
       },
         PLANS.map((plan, i) => {
@@ -2734,7 +2748,7 @@ function PricingPage() {
     ),
 
     // FAQ
-    React.createElement('section', { style: { padding: responsive.isMobile ? '60px 20px' : '130px 40px', background: c.surfaceAlt } },
+    React.createElement('section', { style: { padding: responsive.isMobile ? SECTION_PAD.mobile : SECTION_PAD.desktop, background: c.surfaceAlt } },
       React.createElement('div', { style: { maxWidth: '700px', margin: '0 auto' } },
         React.createElement('h2', { style: { fontSize: FONT_SIZES['2xl'], fontWeight: 800, color: c.text, textAlign: 'center', marginBottom: '40px' } },
           'Frequently Asked Questions'),
@@ -3948,7 +3962,7 @@ function ProviderProfilePage() {
     addToast('Review submitted!', 'success');
   };
 
-  return React.createElement('div', { style: { padding: responsive.isMobile ? '140px 16px 40px' : '96px 32px 40px', maxWidth: '1000px', margin: '0 auto' } },
+  return React.createElement('div', { style: { padding: responsive.isMobile ? '80px 16px 48px' : '32px 32px 48px', maxWidth: CONTAINER.lg, margin: '0 auto' } },
     // Back button
     React.createElement(Button, { variant: 'ghost', size: 'sm', onClick: () => dispatch({type:ACTION_TYPES.NAV_BACK}), icon: Icons.arrowLeft(16), style: { marginBottom: '16px' } }, 'Back'),
 
@@ -4312,7 +4326,7 @@ function ProviderDashboard() {
   const plan = PLANS.find(p => p.id === provider.tier) || PLANS[0];
 
   // ── Overview Tab ──
-  if (tab === 'overview') return React.createElement('div', { style: { padding: responsive.isMobile ? '20px 16px' : '24px 32px' } },
+  if (tab === 'overview') return React.createElement('div', { style: { padding: responsive.isMobile ? '24px 16px' : '32px 40px' } },
     React.createElement('h2', { style: { fontSize: FONT_SIZES['2xl'], fontWeight: 800, color: c.text, marginBottom: '8px' } }, `Welcome, ${provider.name}`),
     React.createElement('p', { style: { color: c.textSecondary, marginBottom: '24px' } }, 'Here is an overview of your account.'),
 
@@ -4426,7 +4440,7 @@ function ProviderDashboard() {
       ),
     );
 
-    return React.createElement('div', { style: { padding: responsive.isMobile ? '20px 16px' : '24px 32px' } },
+    return React.createElement('div', { style: { padding: responsive.isMobile ? '24px 16px' : '32px 40px' } },
       React.createElement('h2', { style: { fontSize: FONT_SIZES['2xl'], fontWeight: 800, color: c.text, marginBottom: '24px' } }, 'Analytics'),
       React.createElement('div', { style: { display: 'grid', gridTemplateColumns: responsive.isMobile ? '1fr' : 'repeat(2, 1fr)', gap: '24px' } },
         // Views Chart
@@ -4613,7 +4627,7 @@ function ProviderDashboard() {
       }
       addToast('Profile updated!', 'success');
     };
-    return React.createElement('div', { style: { padding: responsive.isMobile ? '20px 16px' : '24px 32px', maxWidth: '800px' } },
+    return React.createElement('div', { style: { padding: responsive.isMobile ? '24px 16px' : '32px 40px', maxWidth: '800px' } },
       React.createElement('h2', { style: { fontSize: FONT_SIZES['2xl'], fontWeight: 800, color: c.text, marginBottom: '24px' } }, 'Edit Profile'),
       React.createElement(Card, null,
         React.createElement(Input, { label: 'Short Description', value: editData.shortDescription, onChange: v => setEditData(p=>({...p,shortDescription:v})),
@@ -4706,7 +4720,7 @@ function ProviderDashboard() {
       addToast('Reply sent!', 'success');
     };
 
-    return React.createElement('div', { style: { padding: responsive.isMobile ? '20px 16px' : '24px 32px' } },
+    return React.createElement('div', { style: { padding: responsive.isMobile ? '24px 16px' : '32px 40px' } },
       React.createElement('h2', { style: { fontSize: FONT_SIZES['2xl'], fontWeight: 800, color: c.text, marginBottom: '24px' } }, 'Inbox'),
       myEnquiries.length === 0 ? React.createElement(EmptyState, { icon: Icons.mail(48, c.textMuted), title: 'No enquiries', description: 'Enquiries from participants will appear here.' }) :
       React.createElement('div', { style: { display: 'grid', gridTemplateColumns: responsive.isMobile ? '1fr' : selectedEnquiry ? '300px 1fr' : '1fr', gap: '16px' } },
@@ -4822,7 +4836,7 @@ function ProviderDashboard() {
 
   // ── Bookings Tab ──
   if (tab === 'bookings') {
-    return React.createElement('div', { style: { padding: responsive.isMobile ? '20px 16px' : '24px 32px' } },
+    return React.createElement('div', { style: { padding: responsive.isMobile ? '24px 16px' : '32px 40px' } },
       React.createElement('h2', { style: { fontSize: FONT_SIZES['2xl'], fontWeight: 800, color: c.text, marginBottom: '24px' } }, 'Bookings'),
       myBookings.length === 0 ? React.createElement(EmptyState, { icon: Icons.calendar(48, c.textMuted), title: 'No bookings', description: 'Bookings will appear here when participants book with you.' }) :
       React.createElement('div', { style: { display: 'grid', gap: '12px' } },
@@ -4851,7 +4865,7 @@ function ProviderDashboard() {
 
   // ── Reviews Tab ──
   if (tab === 'reviews') {
-    return React.createElement('div', { style: { padding: responsive.isMobile ? '20px 16px' : '24px 32px' } },
+    return React.createElement('div', { style: { padding: responsive.isMobile ? '24px 16px' : '32px 40px' } },
       React.createElement('h2', { style: { fontSize: FONT_SIZES['2xl'], fontWeight: 800, color: c.text, marginBottom: '8px' } }, 'Reviews'),
       React.createElement('div', { style: { display: 'flex', gap: '16px', marginBottom: '24px' } },
         React.createElement('div', { style: { textAlign: 'center' } },
@@ -4918,7 +4932,7 @@ function ProviderDashboard() {
       addToast('Lead declined', 'info');
     };
 
-    return React.createElement('div', { style: { padding: responsive.isMobile ? '20px 16px' : '24px 32px' } },
+    return React.createElement('div', { style: { padding: responsive.isMobile ? '24px 16px' : '32px 40px' } },
       React.createElement('h2', { style: { fontSize: FONT_SIZES['2xl'], fontWeight: 800, color: c.text, marginBottom: '8px' } }, 'Leads'),
       React.createElement('p', { style: { color: c.textSecondary, marginBottom: '24px' } }, 'Participants looking for your services. Unlock a lead for $25 to view full contact details.'),
 
@@ -5048,7 +5062,7 @@ function ProviderDashboard() {
       }
     };
 
-    return React.createElement('div', { style: { padding: responsive.isMobile ? '20px 16px' : '24px 32px' } },
+    return React.createElement('div', { style: { padding: responsive.isMobile ? '24px 16px' : '32px 40px' } },
       React.createElement('h2', { style: { fontSize: FONT_SIZES['2xl'], fontWeight: 800, color: c.text, marginBottom: '24px' } }, 'Subscription'),
 
       // Current plan
@@ -5119,19 +5133,19 @@ function ProviderDashboard() {
               : React.createElement('table', { style: { width: '100%', borderCollapse: 'collapse' } },
                   React.createElement('thead', null,
                     React.createElement('tr', null,
-                      ['Date', 'Description', 'Amount', 'Status', ''].map(h => React.createElement('th', { key: h || '_action', style: { textAlign: 'left', padding: '10px 12px', fontSize: FONT_SIZES.xs, fontWeight: 700, color: c.textMuted, textTransform: 'uppercase', borderBottom: `1px solid ${c.border}` } }, h)),
+                      ['Date', 'Description', 'Amount', 'Status', ''].map(h => React.createElement('th', { key: h || '_action', style: { textAlign: 'left', padding: '12px 16px', fontSize: FONT_SIZES.xs, fontWeight: 700, color: c.textMuted, textTransform: 'uppercase', borderBottom: `1px solid ${c.border}` } }, h)),
                     ),
                   ),
                   React.createElement('tbody', null,
                     leadPayments.sort((a, b) => new Date(b.unlockedAt || b.createdAt) - new Date(a.unlockedAt || a.createdAt)).map((lead, i) => React.createElement('tr', { key: lead.id },
-                      React.createElement('td', { style: { padding: '10px 12px', borderBottom: `1px solid ${c.border}`, fontSize: FONT_SIZES.sm, color: c.text } },
+                      React.createElement('td', { style: { padding: '12px 16px', borderBottom: `1px solid ${c.border}`, fontSize: FONT_SIZES.sm, color: c.text } },
                         new Date(lead.unlockedAt || lead.createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })),
-                      React.createElement('td', { style: { padding: '10px 12px', borderBottom: `1px solid ${c.border}`, fontSize: FONT_SIZES.sm, color: c.textSecondary } },
+                      React.createElement('td', { style: { padding: '12px 16px', borderBottom: `1px solid ${c.border}`, fontSize: FONT_SIZES.sm, color: c.textSecondary } },
                         `Lead: ${lead.category || 'General'}${lead.participantSuburb ? ' — ' + lead.participantSuburb : ''}`),
-                      React.createElement('td', { style: { padding: '10px 12px', borderBottom: `1px solid ${c.border}`, fontSize: FONT_SIZES.sm, fontWeight: 600, color: c.text } }, '$25.00'),
-                      React.createElement('td', { style: { padding: '10px 12px', borderBottom: `1px solid ${c.border}` } },
+                      React.createElement('td', { style: { padding: '12px 16px', borderBottom: `1px solid ${c.border}`, fontSize: FONT_SIZES.sm, fontWeight: 600, color: c.text } }, '$25.00'),
+                      React.createElement('td', { style: { padding: '12px 16px', borderBottom: `1px solid ${c.border}` } },
                         React.createElement(Badge, { variant: 'success', size: 'xs' }, 'Paid')),
-                      React.createElement('td', { style: { padding: '10px 12px', borderBottom: `1px solid ${c.border}` } },
+                      React.createElement('td', { style: { padding: '12px 16px', borderBottom: `1px solid ${c.border}` } },
                         React.createElement(Button, { variant: 'ghost', size: 'sm', onClick: (e) => { e.stopPropagation(); const date = new Date(lead.unlockedAt || lead.createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' }); printReceipt(`<p style="margin-bottom:4px;font-size:12px;color:#6B7280">Date: ${date}</p><p style="margin-bottom:4px;font-size:12px;color:#6B7280">Reference: ${lead.paymentIntentId || lead.id}</p><hr style="border:none;border-top:1px solid #E5E7EB;margin:16px 0"><div class="row"><span>Lead Unlock — ${lead.category || 'General'}</span><span>$25.00</span></div><div class="row"><span>GST (included)</span><span>$2.27</span></div><div class="row total"><span>Total</span><span>$25.00</span></div><p style="margin-top:16px"><span class="badge">Paid</span></p>`); } }, 'Receipt')),
                     )),
                   ),
@@ -5176,7 +5190,7 @@ function ParticipantDashboard() {
   const myReviews = state.reviews.filter(r => r.participantId === participant.id);
 
   // ── Overview ──
-  if (tab === 'overview') return React.createElement('div', { style: { padding: responsive.isMobile ? '20px 16px' : '24px 32px' } },
+  if (tab === 'overview') return React.createElement('div', { style: { padding: responsive.isMobile ? '24px 16px' : '32px 40px' } },
     React.createElement('h2', { style: { fontSize: FONT_SIZES['2xl'], fontWeight: 800, color: c.text, marginBottom: '8px' } }, `Welcome, ${participant.name}`),
     React.createElement('p', { style: { color: c.textSecondary, marginBottom: '24px' } }, 'Find and connect with NDIS providers.'),
 
@@ -5326,7 +5340,7 @@ function ParticipantDashboard() {
   );
 
   // ── Favourites ──
-  if (tab === 'favourites') return React.createElement('div', { style: { padding: responsive.isMobile ? '20px 16px' : '24px 32px' } },
+  if (tab === 'favourites') return React.createElement('div', { style: { padding: responsive.isMobile ? '24px 16px' : '32px 40px' } },
     React.createElement('h2', { style: { fontSize: FONT_SIZES['2xl'], fontWeight: 800, color: c.text, marginBottom: '24px' } }, 'Saved Providers'),
     favourites.length === 0 ? React.createElement(EmptyState, {
       icon: Icons.heart(48, c.textMuted), title: 'No saved providers',
@@ -5353,7 +5367,7 @@ function ParticipantDashboard() {
     const setReplyText = setPReplyText;
     const sel = myEnquiries.find(e => e.id === selectedId);
 
-    return React.createElement('div', { style: { padding: responsive.isMobile ? '20px 16px' : '24px 32px' } },
+    return React.createElement('div', { style: { padding: responsive.isMobile ? '24px 16px' : '32px 40px' } },
       React.createElement('h2', { style: { fontSize: FONT_SIZES['2xl'], fontWeight: 800, color: c.text, marginBottom: '24px' } }, 'My Enquiries'),
       myEnquiries.length === 0 ? React.createElement(EmptyState, { icon: Icons.mail(48, c.textMuted), title: 'No enquiries', description: 'Send an enquiry to a provider to get started.' }) :
       React.createElement('div', { style: { display: 'grid', gridTemplateColumns: responsive.isMobile ? '1fr' : selectedId ? '300px 1fr' : '1fr', gap: '16px' } },
@@ -5509,7 +5523,7 @@ function ParticipantDashboard() {
       return rate;
     };
 
-    return React.createElement('div', { style: { padding: responsive.isMobile ? '20px 16px' : '24px 32px' } },
+    return React.createElement('div', { style: { padding: responsive.isMobile ? '24px 16px' : '32px 40px' } },
       React.createElement('h2', { style: { fontSize: FONT_SIZES['2xl'], fontWeight: 800, color: c.text, marginBottom: '24px' } }, 'My Bookings'),
       myBookings.length === 0 ? React.createElement(EmptyState, { icon: Icons.calendar(48, c.textMuted), title: 'No bookings', description: 'Book an appointment with a Premium provider.' }) :
       React.createElement('div', { style: { display: 'grid', gap: '12px' } },
@@ -5638,7 +5652,7 @@ function ParticipantDashboard() {
     const acceptedLeads = myLeads.filter(l => l.status === 'unlocked');
     const pendingLeads = myLeads.filter(l => l.status === 'new');
 
-    return React.createElement('div', { style: { padding: responsive.isMobile ? '20px 16px' : '24px 32px' } },
+    return React.createElement('div', { style: { padding: responsive.isMobile ? '24px 16px' : '32px 40px' } },
       React.createElement('h2', { style: { fontSize: FONT_SIZES['2xl'], fontWeight: 800, color: c.text, marginBottom: '8px' } }, 'My Requests'),
       React.createElement('p', { style: { color: c.textSecondary, marginBottom: '24px' } }, 'Track the support requests you have submitted to providers.'),
 
@@ -5693,7 +5707,7 @@ function ParticipantDashboard() {
   }
 
   // ── My Reviews ──
-  if (tab === 'my-reviews') return React.createElement('div', { style: { padding: responsive.isMobile ? '20px 16px' : '24px 32px' } },
+  if (tab === 'my-reviews') return React.createElement('div', { style: { padding: responsive.isMobile ? '24px 16px' : '32px 40px' } },
     React.createElement('h2', { style: { fontSize: FONT_SIZES['2xl'], fontWeight: 800, color: c.text, marginBottom: '24px' } }, 'My Reviews'),
     myReviews.length === 0 ? React.createElement(EmptyState, { icon: Icons.star(48, c.textMuted), title: 'No reviews yet', description: 'Leave a review for providers you have used.' }) :
     myReviews.map(r => {
@@ -5719,7 +5733,7 @@ function ParticipantDashboard() {
   if (tab === 'settings') {
     const editData = pEditData;
     const setEditData = setPEditData;
-    return React.createElement('div', { style: { padding: responsive.isMobile ? '20px 16px' : '24px 32px', maxWidth: '600px' } },
+    return React.createElement('div', { style: { padding: responsive.isMobile ? '24px 16px' : '32px 40px', maxWidth: '600px' } },
       React.createElement('h2', { style: { fontSize: FONT_SIZES['2xl'], fontWeight: 800, color: c.text, marginBottom: '24px' } }, 'Settings'),
       React.createElement(Card, null,
         React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' } },
@@ -5788,7 +5802,7 @@ function AdminDashboard() {
   const totalRevenue = mrr + leadRevenue;
 
   // ── Overview ──
-  if (tab === 'overview') return React.createElement('div', { style: { padding: responsive.isMobile ? '20px 16px' : '24px 32px' } },
+  if (tab === 'overview') return React.createElement('div', { style: { padding: responsive.isMobile ? '24px 16px' : '32px 40px' } },
     React.createElement('h2', { style: { fontSize: FONT_SIZES['2xl'], fontWeight: 800, color: c.text, marginBottom: '24px' } }, 'Admin Dashboard'),
 
     React.createElement('div', { style: { display: 'grid', gridTemplateColumns: responsive.isMobile ? 'repeat(2, 1fr)' : 'repeat(5, 1fr)', gap: '16px', marginBottom: '24px' } },
@@ -5885,7 +5899,7 @@ function AdminDashboard() {
       return true;
     });
 
-    return React.createElement('div', { style: { padding: responsive.isMobile ? '20px 16px' : '24px 32px' } },
+    return React.createElement('div', { style: { padding: responsive.isMobile ? '24px 16px' : '32px 40px' } },
       React.createElement('h2', { style: { fontSize: FONT_SIZES['2xl'], fontWeight: 800, color: c.text, marginBottom: '24px' } }, 'User Management'),
       React.createElement('div', { style: { display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' } },
         React.createElement('div', { style: { flex: 1, minWidth: '200px' } },
@@ -5899,26 +5913,26 @@ function AdminDashboard() {
         React.createElement('table', { style: { width: '100%', borderCollapse: 'collapse' } },
           React.createElement('thead', null,
             React.createElement('tr', null,
-              ['Name','Email','Role','Status','Actions'].map(h => React.createElement('th', { key: h, style: { textAlign: 'left', padding: '10px 12px', fontSize: FONT_SIZES.xs, fontWeight: 700, color: c.textMuted, textTransform: 'uppercase', borderBottom: `1px solid ${c.border}` } }, h)),
+              ['Name','Email','Role','Status','Actions'].map(h => React.createElement('th', { key: h, style: { textAlign: 'left', padding: '12px 16px', fontSize: FONT_SIZES.xs, fontWeight: 700, color: c.textMuted, textTransform: 'uppercase', borderBottom: `1px solid ${c.border}` } }, h)),
             ),
           ),
           React.createElement('tbody', null,
             allUsers.slice(0, 20).map(u => React.createElement('tr', { key: u.id },
-              React.createElement('td', { style: { padding: '10px 12px', borderBottom: `1px solid ${c.border}` } },
+              React.createElement('td', { style: { padding: '12px 16px', borderBottom: `1px solid ${c.border}` } },
                 React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '10px' } },
                   React.createElement(Avatar, { name: u.name, size: 28 }),
                   React.createElement('span', { style: { fontSize: FONT_SIZES.sm, fontWeight: 600, color: c.text } }, u.name),
                 ),
               ),
-              React.createElement('td', { style: { padding: '10px 12px', borderBottom: `1px solid ${c.border}`, fontSize: FONT_SIZES.sm, color: c.textSecondary } }, u.email),
-              React.createElement('td', { style: { padding: '10px 12px', borderBottom: `1px solid ${c.border}` } },
+              React.createElement('td', { style: { padding: '12px 16px', borderBottom: `1px solid ${c.border}`, fontSize: FONT_SIZES.sm, color: c.textSecondary } }, u.email),
+              React.createElement('td', { style: { padding: '12px 16px', borderBottom: `1px solid ${c.border}` } },
                 React.createElement(Badge, { variant: u.role === 'provider' ? 'default' : 'info', size: 'xs' }, u.role),
                 u.tier && React.createElement(Badge, { variant: u.tier, size: 'xs', style: { marginLeft: '4px' } }, u.tier),
               ),
-              React.createElement('td', { style: { padding: '10px 12px', borderBottom: `1px solid ${c.border}` } },
+              React.createElement('td', { style: { padding: '12px 16px', borderBottom: `1px solid ${c.border}` } },
                 React.createElement(Badge, { variant: 'success', size: 'xs' }, 'Active'),
               ),
-              React.createElement('td', { style: { padding: '10px 12px', borderBottom: `1px solid ${c.border}` } },
+              React.createElement('td', { style: { padding: '12px 16px', borderBottom: `1px solid ${c.border}` } },
                 React.createElement('div', { style: { display: 'flex', gap: '6px' } },
                   u.role === 'provider' && React.createElement(Button, {
                     variant: 'ghost', size: 'sm',
@@ -5939,7 +5953,7 @@ function AdminDashboard() {
   }
 
   // ── Providers Management ──
-  if (tab === 'providers-mgmt') return React.createElement('div', { style: { padding: responsive.isMobile ? '20px 16px' : '24px 32px' } },
+  if (tab === 'providers-mgmt') return React.createElement('div', { style: { padding: responsive.isMobile ? '24px 16px' : '32px 40px' } },
     React.createElement('h2', { style: { fontSize: FONT_SIZES['2xl'], fontWeight: 800, color: c.text, marginBottom: '24px' } }, 'Provider Management'),
     React.createElement('div', { style: { display: 'grid', gridTemplateColumns: responsive.isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' } },
       React.createElement(StatCard, { label: 'Elite', value: eliteCount, icon: Icons.crown(20, '#D97706') }),
@@ -5974,7 +5988,7 @@ function AdminDashboard() {
   );
 
   // ── Revenue Tab ──
-  if (tab === 'revenue') return React.createElement('div', { style: { padding: responsive.isMobile ? '20px 16px' : '24px 32px' } },
+  if (tab === 'revenue') return React.createElement('div', { style: { padding: responsive.isMobile ? '24px 16px' : '32px 40px' } },
     React.createElement('h2', { style: { fontSize: FONT_SIZES['2xl'], fontWeight: 800, color: c.text, marginBottom: '24px' } }, 'Revenue'),
     React.createElement('div', { style: { display: 'grid', gridTemplateColumns: responsive.isMobile ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)', gap: '16px', marginBottom: '24px' } },
       React.createElement(StatCard, { icon: Icons.dollarSign(20, COLORS.success), label: 'MRR', value: `$${mrr.toLocaleString()}` }),
@@ -6017,7 +6031,7 @@ function AdminDashboard() {
       revenue: Math.floor(leadRevenue * (0.4 + i * 0.1 + Math.random() * 0.1)),
     }));
 
-    return React.createElement('div', { style: { padding: responsive.isMobile ? '20px 16px' : '24px 32px' } },
+    return React.createElement('div', { style: { padding: responsive.isMobile ? '24px 16px' : '32px 40px' } },
       React.createElement('h2', { style: { fontSize: FONT_SIZES['2xl'], fontWeight: 800, color: c.text, marginBottom: '24px' } }, 'Leads'),
 
       // Stats
@@ -6061,21 +6075,21 @@ function AdminDashboard() {
         React.createElement('table', { style: { width: '100%', borderCollapse: 'collapse' } },
           React.createElement('thead', null,
             React.createElement('tr', null,
-              ['Provider','Participant','Category','Status','Amount','Date'].map(h => React.createElement('th', { key: h, style: { textAlign: 'left', padding: '10px 12px', fontSize: FONT_SIZES.xs, fontWeight: 700, color: c.textMuted, textTransform: 'uppercase', borderBottom: `1px solid ${c.border}` } }, h)),
+              ['Provider','Participant','Category','Status','Amount','Date'].map(h => React.createElement('th', { key: h, style: { textAlign: 'left', padding: '12px 16px', fontSize: FONT_SIZES.xs, fontWeight: 700, color: c.textMuted, textTransform: 'uppercase', borderBottom: `1px solid ${c.border}` } }, h)),
             ),
           ),
           React.createElement('tbody', null,
             allLeads.slice(0, 50).map(lead => {
               const prov = state.providers.find(p => p.id === lead.providerId);
               return React.createElement('tr', { key: lead.id },
-                React.createElement('td', { style: { padding: '10px 12px', borderBottom: `1px solid ${c.border}`, fontSize: FONT_SIZES.sm, color: c.text } }, prov?.name || 'Unknown'),
-                React.createElement('td', { style: { padding: '10px 12px', borderBottom: `1px solid ${c.border}`, fontSize: FONT_SIZES.sm, color: c.textSecondary } }, lead.participantName || 'Unknown'),
-                React.createElement('td', { style: { padding: '10px 12px', borderBottom: `1px solid ${c.border}` } }, React.createElement(Badge, { size: 'xs' }, lead.category || '-')),
-                React.createElement('td', { style: { padding: '10px 12px', borderBottom: `1px solid ${c.border}` } },
+                React.createElement('td', { style: { padding: '12px 16px', borderBottom: `1px solid ${c.border}`, fontSize: FONT_SIZES.sm, color: c.text } }, prov?.name || 'Unknown'),
+                React.createElement('td', { style: { padding: '12px 16px', borderBottom: `1px solid ${c.border}`, fontSize: FONT_SIZES.sm, color: c.textSecondary } }, lead.participantName || 'Unknown'),
+                React.createElement('td', { style: { padding: '12px 16px', borderBottom: `1px solid ${c.border}` } }, React.createElement(Badge, { size: 'xs' }, lead.category || '-')),
+                React.createElement('td', { style: { padding: '12px 16px', borderBottom: `1px solid ${c.border}` } },
                   React.createElement(Badge, { variant: lead.status === 'new' ? 'warning' : lead.status === 'unlocked' ? 'success' : 'error', size: 'xs' }, lead.status.charAt(0).toUpperCase() + lead.status.slice(1)),
                 ),
-                React.createElement('td', { style: { padding: '10px 12px', borderBottom: `1px solid ${c.border}`, fontSize: FONT_SIZES.sm, fontWeight: 600, color: c.text } }, lead.status === 'unlocked' ? '$25' : '-'),
-                React.createElement('td', { style: { padding: '10px 12px', borderBottom: `1px solid ${c.border}`, fontSize: FONT_SIZES.sm, color: c.textMuted } }, lead.createdAt ? new Date(lead.createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) : '-'),
+                React.createElement('td', { style: { padding: '12px 16px', borderBottom: `1px solid ${c.border}`, fontSize: FONT_SIZES.sm, fontWeight: 600, color: c.text } }, lead.status === 'unlocked' ? '$25' : '-'),
+                React.createElement('td', { style: { padding: '12px 16px', borderBottom: `1px solid ${c.border}`, fontSize: FONT_SIZES.sm, color: c.textMuted } }, lead.createdAt ? new Date(lead.createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) : '-'),
               );
             }),
           ),
@@ -6089,7 +6103,7 @@ function AdminDashboard() {
   if (tab === 'reports') {
     const reports = state.reports || [];
     const statusColors = { pending: COLORS.warning, reviewed: COLORS.info, resolved: COLORS.success };
-    return React.createElement('div', { style: { padding: responsive.isMobile ? '20px 16px' : '24px 32px' } },
+    return React.createElement('div', { style: { padding: responsive.isMobile ? '24px 16px' : '32px 40px' } },
       React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' } },
         React.createElement('h2', { style: { fontSize: FONT_SIZES['2xl'], fontWeight: 800, color: c.text } }, 'Provider Reports'),
         React.createElement('div', { style: { display: 'flex', gap: '8px' } },
@@ -6141,7 +6155,7 @@ function AdminDashboard() {
   }
 
   // ── Activity Tab ──
-  if (tab === 'activity') return React.createElement('div', { style: { padding: responsive.isMobile ? '20px 16px' : '24px 32px' } },
+  if (tab === 'activity') return React.createElement('div', { style: { padding: responsive.isMobile ? '24px 16px' : '32px 40px' } },
     React.createElement('h2', { style: { fontSize: FONT_SIZES['2xl'], fontWeight: 800, color: c.text, marginBottom: '24px' } }, 'Activity Feed'),
     React.createElement(Card, null,
       [
