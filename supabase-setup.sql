@@ -241,3 +241,19 @@ ALTER TABLE providers ADD COLUMN IF NOT EXISTS cta_text text DEFAULT 'Get in Tou
 ALTER TABLE providers ADD COLUMN IF NOT EXISTS video_url text;
 ALTER TABLE providers ADD COLUMN IF NOT EXISTS featured_services text[] DEFAULT '{}';
 ALTER TABLE providers ADD COLUMN IF NOT EXISTS gallery_layout text DEFAULT 'grid';
+
+-- ── Phase 6: Email Signups (Pre-launch Capture) ──
+create table if not exists email_signups (
+  id uuid default gen_random_uuid() primary key,
+  email text not null unique,
+  type text default 'participant' check (type in ('participant', 'provider', 'general')),
+  source text default 'landing',
+  created_at timestamptz default now()
+);
+
+alter table email_signups enable row level security;
+-- Anyone can insert (public signup), only admins read
+create policy "Anyone can insert email signups" on email_signups for insert with check (true);
+create policy "Admins can read email signups" on email_signups for select using (
+  exists (select 1 from user_profiles where user_profiles.id = auth.uid() and user_profiles.role = 'admin')
+);

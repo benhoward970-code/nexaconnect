@@ -484,6 +484,19 @@ export async function markNotificationRead(notifId) {
   return true;
 }
 
+// ── Email Signups ──
+
+export async function submitEmailSignup(email, type = 'general', source = 'landing') {
+  if (!isSupabaseConfigured()) return null;
+  const { data, error } = await supabase.from('email_signups').insert({ email, type, source }).select().single();
+  if (error) {
+    if (error.code === '23505') return { duplicate: true }; // unique constraint
+    console.error('submitEmailSignup:', error);
+    return null;
+  }
+  return data;
+}
+
 // ── Stripe helpers ──
 
 export async function updateProviderStripe(providerId, stripeData) {

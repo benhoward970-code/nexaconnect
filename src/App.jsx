@@ -196,6 +196,22 @@ function injectStyles() {
 
     .nc-glass-hover:hover { border-color: rgba(59,130,246,0.2) !important; box-shadow: 0 4px 16px rgba(59,130,246,0.08) !important; }
     .nc-card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.08) !important; border-color: rgba(59,130,246,0.15) !important; }
+
+    /* Mobile table scroll */
+    .nc-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -4px; padding: 0 4px; }
+    .nc-table-wrap table { min-width: 600px; }
+
+    /* Mobile nav menu overlay */
+    .nc-mobile-menu { position: fixed; top: 60px; left: 0; right: 0; bottom: 0; z-index: 99; animation: nc-fadeIn 0.2s ease; }
+
+    /* Touch-friendly tap targets */
+    @media (max-width: 768px) {
+      button, a, input, select, textarea { min-height: 44px; }
+      .nc-card-hover:hover { transform: none !important; }
+    }
+
+    /* Prevent horizontal overflow on mobile */
+    html, body { overflow-x: hidden; }
   `;
   document.head.appendChild(style);
 }
@@ -447,32 +463,98 @@ function MultiSelectChips({ label, options, selected = [], onChange }) {
 
 function Modal({ open, onClose, title, children, width = '500px' }) {
   const { theme } = useTheme();
+  const responsive = useResponsive();
   const c = COLORS[theme];
   if (!open) return null;
   return React.createElement('div', {
     onClick: onClose,
     style: {
-      position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      position: 'fixed', inset: 0, zIndex: 1000, display: 'flex',
+      alignItems: responsive.isMobile ? 'flex-end' : 'center',
+      justifyContent: 'center',
       background: c.overlay, animation: 'nc-fadeIn 0.2s ease',
+      padding: responsive.isMobile ? 0 : '20px',
     },
   },
     React.createElement('div', {
       onClick: (e) => e.stopPropagation(),
       style: {
-        ...glassStyle(theme), width, maxWidth: '92vw', maxHeight: '85vh', overflowY: 'auto',
-        padding: SPACING['2xl'], animation: 'nc-scaleIn 0.25s ease', background: c.surface,
-        borderRadius: RADIUS.xl,
+        ...glassStyle(theme),
+        width: responsive.isMobile ? '100%' : width,
+        maxWidth: responsive.isMobile ? '100%' : '92vw',
+        maxHeight: responsive.isMobile ? '90vh' : '85vh',
+        overflowY: 'auto',
+        padding: responsive.isMobile ? '20px 16px 32px' : SPACING['2xl'],
+        animation: responsive.isMobile ? 'nc-slideUp 0.3s ease' : 'nc-scaleIn 0.25s ease',
+        background: c.surface,
+        borderRadius: responsive.isMobile ? `${RADIUS.xl} ${RADIUS.xl} 0 0` : RADIUS.xl,
       },
     },
       React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.xl } },
-        React.createElement('h3', { style: { fontSize: FONT_SIZES.lg, fontWeight: 600, color: c.text } }, title),
+        React.createElement('h3', { style: { fontSize: FONT_SIZES.lg, fontWeight: 600, color: c.text, flex: 1, paddingRight: '8px' } }, title),
         React.createElement('button', {
           onClick: onClose,
-          style: { background: 'none', border: 'none', cursor: 'pointer', color: c.textMuted, padding: SPACING.sm, borderRadius: RADIUS.sm },
+          style: { background: 'none', border: 'none', cursor: 'pointer', color: c.textMuted, padding: SPACING.sm, borderRadius: RADIUS.sm, flexShrink: 0 },
         }, Icons.x(18)),
       ),
       children,
     ),
+  );
+}
+
+function EmailCapture({ source = 'landing', accent = false }) {
+  const { theme } = useTheme();
+  const c = COLORS[theme];
+  const { addToast } = useToast();
+  const [email, setEmail] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!email || !email.includes('@')) { addToast('Please enter a valid email', 'error'); return; }
+    setSubmitting(true);
+    const result = await db.submitEmailSignup(email, 'general', source);
+    setSubmitting(false);
+    if (result && result.duplicate) {
+      addToast('You\'re already on our list!', 'info');
+      setSubmitted(true);
+    } else if (result) {
+      addToast('Thanks! We\'ll keep you updated.', 'success');
+      setSubmitted(true);
+    } else {
+      addToast('Something went wrong. Try again.', 'error');
+    }
+  };
+
+  if (submitted) {
+    return React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', color: accent ? '#fff' : COLORS.success, fontWeight: 600, fontSize: FONT_SIZES.sm } },
+      Icons.check(18, accent ? '#fff' : COLORS.success), 'You\'re on the list! We\'ll be in touch.');
+  }
+
+  return React.createElement('form', {
+    onSubmit: handleSubmit,
+    style: { display: 'flex', gap: '8px', maxWidth: '460px', margin: '0 auto', flexWrap: 'wrap', justifyContent: 'center' },
+  },
+    React.createElement('input', {
+      type: 'email', placeholder: 'Enter your email', value: email,
+      onChange: (e) => setEmail(e.target.value),
+      style: {
+        flex: '1 1 260px', padding: '12px 16px', borderRadius: RADIUS.md, fontSize: FONT_SIZES.sm,
+        fontFamily: FONTS.sans, border: accent ? '2px solid rgba(255,255,255,0.3)' : `1px solid ${c.border}`,
+        background: accent ? 'rgba(255,255,255,0.15)' : c.surface,
+        color: accent ? '#fff' : c.text, outline: 'none',
+      },
+    }),
+    React.createElement('button', {
+      type: 'submit', disabled: submitting,
+      style: {
+        padding: '12px 24px', borderRadius: RADIUS.md, border: 'none', cursor: 'pointer',
+        background: accent ? '#fff' : COLORS.primary[600], color: accent ? '#F97316' : '#fff',
+        fontWeight: 600, fontSize: FONT_SIZES.sm, fontFamily: FONTS.sans, whiteSpace: 'nowrap',
+        opacity: submitting ? 0.7 : 1,
+      },
+    }, submitting ? 'Sending...' : 'Get Early Access'),
   );
 }
 
@@ -1006,6 +1088,65 @@ const PROVIDERS_DATA = [
     availability:{mon:'8am-5pm',tue:'8am-5pm',wed:'8am-5pm',thu:'8am-5pm',fri:'8am-3pm',sat:'Closed',sun:'Closed'},
     serviceAreas:['Merewether','Newcastle','Charlestown','Lake Macquarie'],founded:2020,teamSize:'6',languages:['English','Italian'],
     features:['Home mods','Driver assessments','Sensory support','Functional assessments'],viewsThisMonth:88,enquiriesThisMonth:7,bookingsThisMonth:5 },
+  { id:'p21',name:'Hunter Exercise Physiology',email:'hunterep@provider.com.au',password:'password',tier:'professional',verified:true,
+    workerScreeningStatus:'verified',workerScreeningNumber:'WSC-2025-021001',workerScreeningExpiry:'2027-06-30',
+    categories:['physiotherapy','community'],suburb:'Adamstown',state:'NSW',postcode:'2289',phone:'02 4952 3344',website:'www.hunterep.com.au',
+    description:'Accredited exercise physiologists delivering NDIS-funded exercise programs for mobility, strength, and chronic disease management. Gym and hydrotherapy sessions available.',
+    shortDescription:'Exercise physiology for mobility and strength.',
+    photos:['Gym session','Hydrotherapy','Group fitness'],
+    rating:4.7,reviewCount:33,responseRate:94,responseTime:'< 4 hours',waitTime:'1-2 weeks',
+    planTypes:['Agency','Plan Managed','Self Managed'],
+    availability:{mon:'6am-7pm',tue:'6am-7pm',wed:'6am-7pm',thu:'6am-7pm',fri:'6am-5pm',sat:'8am-12pm',sun:'Closed'},
+    serviceAreas:['Adamstown','Newcastle','Merewether','Lambton','Kotara'],
+    founded:2019,teamSize:'9',languages:['English','Greek'],
+    features:['Hydrotherapy','Group programs','Home visits','Telehealth'],viewsThisMonth:127,enquiriesThisMonth:14,bookingsThisMonth:9 },
+  { id:'p22',name:'Kaleidoscope Art Therapy',email:'kaleidoscope@provider.com.au',password:'password',tier:'starter',verified:false,
+    categories:['therapy','community'],suburb:'Hamilton',state:'NSW',postcode:'2303',phone:'02 4969 5566',website:'',
+    description:'Creative arts therapy using visual art, music, and drama to support emotional wellbeing, self-expression, and social skills for people with disability.',
+    shortDescription:'Creative arts therapy for wellbeing.',
+    photos:['Art studio','Group painting session'],
+    rating:4.4,reviewCount:15,responseRate:85,responseTime:'< 1 day',waitTime:'1-2 weeks',
+    planTypes:['Plan Managed','Self Managed'],
+    availability:{mon:'10am-4pm',tue:'10am-4pm',wed:'10am-6pm',thu:'10am-4pm',fri:'10am-2pm',sat:'Closed',sun:'Closed'},
+    serviceAreas:['Hamilton','Newcastle','Islington','Broadmeadow'],
+    founded:2023,teamSize:'3',languages:['English'],
+    features:['Art therapy','Music therapy','Group programs','Individual sessions'],viewsThisMonth:56,enquiriesThisMonth:5,bookingsThisMonth:3 },
+  { id:'p23',name:'Navigator Support Coordination',email:'navigator@provider.com.au',password:'password',tier:'premium',verified:true,
+    workerScreeningStatus:'verified',workerScreeningNumber:'WSC-2025-023001',workerScreeningExpiry:'2027-04-15',
+    categories:['support-coordination','plan-management'],suburb:'Maitland',state:'NSW',postcode:'2320',phone:'02 4934 7788',website:'www.navigatorsc.com.au',
+    description:'Specialist and psychosocial support coordination helping participants with complex needs navigate the NDIS, build provider networks, and achieve plan goals.',
+    shortDescription:'Specialist support coordination for complex needs.',
+    photos:['Team meeting','Office','Community event'],
+    rating:4.8,reviewCount:41,responseRate:98,responseTime:'< 2 hours',waitTime:'Immediate',
+    planTypes:['Agency','Plan Managed','Self Managed'],
+    availability:{mon:'8am-6pm',tue:'8am-6pm',wed:'8am-6pm',thu:'8am-6pm',fri:'8am-4pm',sat:'By appt',sun:'Closed'},
+    serviceAreas:['Maitland','Cessnock','Singleton','Raymond Terrace','Newcastle'],
+    founded:2020,teamSize:'14',languages:['English','Arabic','Vietnamese','Mandarin'],
+    features:['Specialist SC','Psychosocial SC','Crisis support','Hospital discharge planning'],viewsThisMonth:201,enquiriesThisMonth:24,bookingsThisMonth:18 },
+  { id:'p24',name:'Bright Futures Tutoring',email:'brightfutures@provider.com.au',password:'password',tier:'professional',verified:true,
+    workerScreeningStatus:'verified',workerScreeningNumber:'WSC-2025-024001',workerScreeningExpiry:'2027-08-20',
+    categories:['early-intervention','therapy'],suburb:'Charlestown',state:'NSW',postcode:'2290',phone:'02 4942 9900',website:'www.brightfuturestutor.com.au',
+    description:'Specialised tutoring and educational support for children and young adults with learning disabilities, autism, and intellectual disability. NDIS capacity building funded.',
+    shortDescription:'Specialised tutoring for learning disabilities.',
+    photos:['Tutoring session','Learning resources'],
+    rating:4.6,reviewCount:22,responseRate:92,responseTime:'< 6 hours',waitTime:'2-3 weeks',
+    planTypes:['Plan Managed','Self Managed'],
+    availability:{mon:'9am-6pm',tue:'9am-6pm',wed:'9am-6pm',thu:'9am-6pm',fri:'9am-4pm',sat:'9am-1pm',sun:'Closed'},
+    serviceAreas:['Charlestown','Lake Macquarie','Belmont','Toronto','Warners Bay'],
+    founded:2021,teamSize:'7',languages:['English','Mandarin'],
+    features:['1:1 tutoring','Small groups','School support','Transition planning'],viewsThisMonth:94,enquiriesThisMonth:11,bookingsThisMonth:7 },
+  { id:'p25',name:'Port Stephens Disability Services',email:'portstephens@provider.com.au',password:'password',tier:'elite',verified:true,
+    workerScreeningStatus:'verified',workerScreeningNumber:'WSC-2025-025001',workerScreeningExpiry:'2027-12-01',
+    categories:['daily-living','community','respite','accommodation'],suburb:'Nelson Bay',state:'NSW',postcode:'2315',phone:'02 4981 1122',website:'www.psds.com.au',
+    description:'Comprehensive disability services across Port Stephens including daily living support, community access, short-term respite, and supported independent living. Serving the region since 2011.',
+    shortDescription:'Comprehensive disability services across Port Stephens.',
+    photos:['Community outing','SIL house','Beach activity','Team photo'],
+    rating:4.7,reviewCount:58,responseRate:96,responseTime:'< 2 hours',waitTime:'1-2 weeks',
+    planTypes:['Agency','Plan Managed','Self Managed'],
+    availability:{mon:'24/7',tue:'24/7',wed:'24/7',thu:'24/7',fri:'24/7',sat:'24/7',sun:'24/7'},
+    serviceAreas:['Nelson Bay','Salamander Bay','Raymond Terrace','Medowie','Tanilba Bay'],
+    founded:2011,teamSize:'65+',languages:['English','Filipino','Arabic','Samoan'],
+    features:['24/7 support','SIL homes','Respite care','Community access','Transport'],viewsThisMonth:245,enquiriesThisMonth:19,bookingsThisMonth:11 },
 ];
 
 // ── Simulated Participants ──
@@ -2009,6 +2150,7 @@ function Navbar() {
   const isLoggedIn = !!state.user;
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
   const dropdownRef = useRef(null);
   const notifRef = useRef(null);
   useEffect(() => {
@@ -2091,10 +2233,14 @@ function Navbar() {
           variant: 'ghost', size: 'md',
           onClick: () => dispatch({type:ACTION_TYPES.NAV_GOTO,payload:{route:'login'}}),
         }, 'Log In'),
-        React.createElement(Button, {
+        !responsive.isMobile && React.createElement(Button, {
           variant: 'primary', size: 'md',
           onClick: () => dispatch({type:ACTION_TYPES.NAV_GOTO,payload:{route:'register'}}),
         }, 'Get Started'),
+        responsive.isMobile && isMarketing && React.createElement('button', {
+          onClick: () => setShowMobileMenu(!showMobileMenu),
+          style: { background: 'none', border: 'none', cursor: 'pointer', color: c.text, display: 'flex', padding: '8px' },
+        }, showMobileMenu ? Icons.x(24) : Icons.menu(24)),
       ),
 
       isLoggedIn && React.createElement(Fragment, null,
@@ -2155,6 +2301,41 @@ function Navbar() {
             }, Icons.logout(16, COLORS.error), 'Log Out'),
           ),
         ),
+      ),
+    ),
+
+    // Mobile Menu Overlay (logged-out, marketing pages)
+    responsive.isMobile && showMobileMenu && !isLoggedIn && React.createElement('div', {
+      className: 'nc-mobile-menu',
+      onClick: () => setShowMobileMenu(false),
+      style: { background: c.overlay },
+    },
+      React.createElement('div', {
+        onClick: (e) => e.stopPropagation(),
+        style: {
+          background: c.surface, borderBottom: `1px solid ${c.border}`,
+          padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '4px',
+          animation: 'nc-fadeIn 0.2s ease',
+        },
+      },
+        ['Directory', 'Pricing', 'About'].map(item => React.createElement('button', {
+          key: item,
+          onClick: () => { dispatch({type:ACTION_TYPES.NAV_GOTO,payload:{route: item.toLowerCase()}}); setShowMobileMenu(false); },
+          style: {
+            background: 'none', border: 'none', color: c.text, cursor: 'pointer', padding: '14px 12px',
+            fontSize: FONT_SIZES.base, fontWeight: 500, fontFamily: FONTS.sans, textAlign: 'left',
+            borderRadius: RADIUS.md,
+          },
+        }, item)),
+        React.createElement('div', { style: { height: '1px', background: c.border, margin: '8px 0' } }),
+        React.createElement(Button, {
+          variant: 'ghost', size: 'md', style: { justifyContent: 'flex-start', width: '100%' },
+          onClick: () => { dispatch({type:ACTION_TYPES.NAV_GOTO,payload:{route:'login'}}); setShowMobileMenu(false); },
+        }, 'Log In'),
+        React.createElement(Button, {
+          variant: 'primary', size: 'md', style: { width: '100%' },
+          onClick: () => { dispatch({type:ACTION_TYPES.NAV_GOTO,payload:{route:'register'}}); setShowMobileMenu(false); },
+        }, 'Get Started'),
       ),
     ),
   );
@@ -2301,8 +2482,10 @@ function Footer() {
             ),
             React.createElement('span', { style: { fontFamily: FONTS.display, fontWeight: 500, fontSize: FONT_SIZES.md, color: c.text } }, 'NexaConnect'),
           ),
-          React.createElement('p', { style: { color: c.textSecondary, fontSize: FONT_SIZES.sm, lineHeight: 1.6 } },
+          React.createElement('p', { style: { color: c.textSecondary, fontSize: FONT_SIZES.sm, lineHeight: 1.6, marginBottom: '16px' } },
             'Connecting NDIS participants with quality providers across Australia.'),
+          React.createElement('p', { style: { color: c.text, fontSize: FONT_SIZES.xs, fontWeight: 600, marginBottom: '8px' } }, 'Stay updated'),
+          React.createElement(EmailCapture, { source: 'footer' }),
         ),
         // Links columns
         ...[
@@ -2425,7 +2608,7 @@ function LandingPage() {
               maxWidth: '560px', margin: '0 auto 40px', lineHeight: 1.7,
             },
           }, 'Browse trusted providers, read real reviews, and connect for free. The smarter way to find disability support services.'),
-          React.createElement('div', { style: { display: 'flex', gap: SPACING.base, justifyContent: 'center', flexWrap: 'wrap' } },
+          React.createElement('div', { style: { display: 'flex', gap: SPACING.base, justifyContent: 'center', flexWrap: 'wrap', marginBottom: '24px' } },
             React.createElement(Button, {
               variant: 'primary', size: 'lg',
               onClick: () => dispatch({type:ACTION_TYPES.NAV_GOTO,payload:{route:'directory'}}),
@@ -2435,6 +2618,11 @@ function LandingPage() {
               variant: 'outline', size: 'lg',
               onClick: () => dispatch({type:ACTION_TYPES.NAV_GOTO,payload:{route:'register'}}),
             }, 'List Your Service'),
+          ),
+          // Email capture
+          React.createElement('div', { style: { maxWidth: '480px', margin: '0 auto' } },
+            React.createElement('p', { style: { fontSize: FONT_SIZES.xs, color: c.textMuted, marginBottom: '8px' } }, 'Or get notified when we launch in your area'),
+            React.createElement(EmailCapture, { source: 'hero' }),
           ),
         ),
       ),
@@ -2452,7 +2640,7 @@ function LandingPage() {
           display: 'flex', justifyContent: 'space-around', flexWrap: 'wrap', gap: '20px',
         },
       },
-        [['500+','Providers in the Hunter Region'],['2,000+','Active Participants'],['15','Service Categories'],['4.7','Average Rating']].map(([val,label],i) =>
+        [['500+','Providers in the Hunter Region'],['2,000+','Active Participants'],['15','Service Categories'],['4.6','Average Provider Rating']].map(([val,label],i) =>
           React.createElement('div', { key: i, style: { textAlign: 'center' } },
             React.createElement('p', { style: { fontSize: FONT_SIZES['2xl'], fontWeight: 800, ...gradientText() } }, val),
             React.createElement('p', { style: { fontSize: FONT_SIZES.sm, color: c.textSecondary } }, label),
@@ -2612,7 +2800,7 @@ function LandingPage() {
       ),
     ),
 
-    // Final CTA
+    // Final CTA with Email Capture
     React.createElement('section', {
       style: {
         padding: responsive.isMobile ? SECTION_PAD.mobile : SECTION_PAD.desktop, textAlign: 'center',
@@ -2624,18 +2812,13 @@ function LandingPage() {
           padding: responsive.isMobile ? '48px 24px' : '64px 48px', position: 'relative', overflow: 'hidden',
         },
       },
-        // Decorative radial gradient overlay
         React.createElement('div', { style: { position: 'absolute', inset: 0, background: 'radial-gradient(circle at 80% 20%, rgba(255,255,255,0.15) 0%, transparent 50%)', pointerEvents: 'none' } }),
         React.createElement('div', { style: { position: 'relative', zIndex: 1 } },
           React.createElement('h2', { style: { fontSize: responsive.isMobile ? FONT_SIZES['2xl'] : FONT_SIZES['4xl'], fontFamily: FONTS.display, fontWeight: 400, color: '#fff', marginBottom: '16px' } },
             'Start Your Journey Today'),
-          React.createElement('p', { style: { color: 'rgba(255,255,255,0.85)', fontSize: FONT_SIZES.md, marginBottom: '32px', maxWidth: '500px', margin: '0 auto 32px' } },
+          React.createElement('p', { style: { color: 'rgba(255,255,255,0.85)', fontSize: FONT_SIZES.md, marginBottom: '24px', maxWidth: '500px', margin: '0 auto 24px' } },
             'Join thousands of NDIS participants and providers already using NexaConnect.'),
-          React.createElement(Button, {
-            variant: 'secondary', size: 'lg',
-            onClick: () => dispatch({type:ACTION_TYPES.NAV_GOTO,payload:{route:'register'}}),
-            style: { background: '#fff', color: '#F97316', border: 'none', fontWeight: 600 },
-          }, 'Get Started Free'),
+          React.createElement(EmailCapture, { source: 'landing-cta', accent: true }),
         ),
       ),
     ),
